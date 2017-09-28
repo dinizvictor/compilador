@@ -1,4 +1,4 @@
-# compilador
+# Compilador
 UFRRJ - IM
 Projeto de Compilador
 
