@@ -1,8 +1,0 @@
-iniziare principale(){
-	
-	tutto b = 199, c = 1;
-	reale v = 1.99, x = 4;
-	boole f = false;
-	carat a = 'a';
-
-}
