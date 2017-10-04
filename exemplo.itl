@@ -1,8 +1,4 @@
 iniziare principale(){
-	
-	tutto b = 199, c = 1;
-	reale v = 1.99;
-	boole f = false;
-	carat a = 'a';
-
+	tutto a;
+	a = 1.0 + 1;
 }

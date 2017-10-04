@@ -18,23 +18,32 @@ struct atributos
 
 int yylex(void);
 
-string MSG_ERRO = "Errore:";
+string MSG_ERRO = "\nErrore:\n";
+string MSG_ERRO_TIPO = "\nErrore:\nTipo errato per variabile\n";
+string MSG_ERRO_NDECLARADA = "\nErrore:\nVariabile non dichiarata\n";
+string MSG_ERRO_DECLARADA = "\nErrore:\nVariabile già dichiarata\n";
 
 void yyerror(string);
 
 static int ctdDInt = 0, ctdDFloat = 0, ctdDChar = 0, ctdDBool = 0;
+static int fazCasting;
+static int tipoGeral;
 
-std::map<string,atributos> mapaDeVariaveis; 
+static std::map<string,atributos> mapaDeVariaveis; 
 
-string tabelaDeTipos(string tipo1, string tipo2){
+int tabelaDeTipos(string tipo1, string tipo2){
 
-	if(tipo1 == "inteiro" && tipo2 == "inteiro"){
-		ctdDInt += 1;
-		return "int";
+	if(tipo1 == "int" && tipo2 == "int"){
+		return 0;
+	}
+	else if(tipo1 == "float" && tipo2 == "float"){
+		return 3;
+	}
+	else if(tipo1 == "int" && tipo2 == "float"){
+		return 1;
 	}
 	else{
-		ctdDFloat += 1;
-		return "float";
+		return 2;
 	}
 }
 
@@ -43,18 +52,22 @@ string geraVarTemp(string tipo){
 	static int nI = 0, nF = 0, nC = 0, nB = 0;
 	
 	if(tipo == "int"){
+		ctdDInt += 1;
 		nI++;
 		return "TMP_INT_" + to_string(nI);
 	}
-	if(tipo == "float"){
+	if(tipo == "float"){		
+		ctdDFloat += 1;
 		nF++;
 		return "TMP_FLOAT_" + to_string(nF);
 	}
 	if(tipo == "char"){
+		ctdDChar += 1;
 		nC++;
 		return "TMP_CHAR_" + to_string(nC);
 	}
 	if(tipo == "bool"){
+		ctdDBool += 1;
 		nB++;
 		return "TMP_BOOL_" + to_string(nB);
 	}
@@ -103,50 +116,13 @@ string geraLabelFinal(){
 
 	return declaracao + "\n";
 }
-
-/*string geraLabelFinalAtribuicao(){
-	int i = 1;
-	string declaracao = ""; 
-
-	if(ctdDInt > 0){
-		declaracao = declaracao + "\tint ";
-		while(i < ctdDInt){
-			declaracao = declaracao + "TMP_INT_" + to_string(i) + ", ";
-			i++;
-		}
-		declaracao = declaracao + "TMP_INT_" + to_string(i) + ";\n";
-		i = 1;
+bool variavelExistente(string variavel){
+	if(variavel != ""){
+		std::cout <<MSG_ERRO_DECLARADA<< std::endl;
+		exit(1); 
 	}
-	if(ctdDFloat > 0){
-		declaracao = declaracao + "\tfloat ";
-		while(i < ctdDFloat){
-			declaracao = declaracao + "TMP_FLOAT_" + to_string(i) + ", ";
-			i++;
-		}
-		declaracao = declaracao + "TMP_FLOAT_" + to_string(i) + ";\n";
-		i = 1;
-	}
-	if(ctdDChar > 0){
-		declaracao = declaracao + "\tchar ";
-		while(i < ctdDChar){
-			declaracao = declaracao + "TMP_CHAR_" + to_string(i) + ", ";
-			i++;
-		}
-		declaracao = declaracao + "TMP_CHAR_" + to_string(i) + ";\n";
-		i = 1;
-	}
-	if(ctdDBool > 0){
-		declaracao = declaracao + "\tbool ";
-		while(i < ctdDBool){
-			declaracao = declaracao + "TMP_BOOL_" + to_string(i) + ", ";
-			i++;
-		}
-		declaracao = declaracao + "TMP_BOOL_" + to_string(i) + ";\n";
-		i = 1;
-	}
-
-	return declaracao + "\n";
-}*/
+	return true;
+}
 
 %}
 
@@ -195,6 +171,7 @@ string geraLabelFinal(){
 
 %token TOKEN_ATR
 
+
 %left TOKEN_E TOKEN_OU 
 %left TOKEN_MAIOR TOKEN_MENOR TOKEN_MAIORIGUAL TOKEN_MENORIGUAL TOKEN_DIF TOKEN_IGUAL 
 %left ','
@@ -232,19 +209,60 @@ COMANDOS	: COMANDO COMANDOS
 			}
 			;
 
-COMANDO 	: E ';' 
-			| ERL ';' 
+COMANDO 	: TOKEN_NOMEVAR TOKEN_ATR E ';' 
+			{
+				if(mapaDeVariaveis.find($1.label) != mapaDeVariaveis.end()){
+					if(mapaDeVariaveis[$1.label].tipo == "int" || mapaDeVariaveis[$1.label].tipo == "float"){
+						
+						string theCasting = "";
+						if(mapaDeVariaveis[$1.label].tipo != $3.tipo){											
+							mapaDeVariaveis[$1.label].tipo = "float";
+							string labelCasting = geraVarTemp(mapaDeVariaveis[$1.label].tipo);
+							theCasting = "\t" + labelCasting + " = (float) " + mapaDeVariaveis[$1.label].label + ";\n";
+							mapaDeVariaveis[$1.label].label = labelCasting;
+						}				
+						mapaDeVariaveis[$1.label].valor = $3.traducao;
+						$$.traducao = $3.traducao + theCasting + "\t" + mapaDeVariaveis[$1.label].label + " = " + $3.label +";\n";
+					}
+					else{
+						std::cout <<MSG_ERRO_TIPO<< std::endl;
+						exit(1);									
+					}					
+				}	
+				else {
+					std::cout <<MSG_ERRO_NDECLARADA<< std::endl;
+					exit(1);				
+				}
+			}
+			| TOKEN_NOMEVAR TOKEN_ATR ERL ';' 
+			{
+				if(mapaDeVariaveis.find($1.label) != mapaDeVariaveis.end()){
+					if(mapaDeVariaveis[$1.label].tipo == "bool"){
+						mapaDeVariaveis[$1.label].valor = $3.traducao;
+						$$.traducao = $3.traducao + "\t" + mapaDeVariaveis[$1.label].label + " = " + $3.label +";\n";
+					}
+					else{
+						std::cout <<MSG_ERRO_TIPO<< std::endl;
+						exit(1);									
+					}
+				}	
+				else {
+					std::cout <<MSG_ERRO_NDECLARADA<< std::endl;
+					exit(1);				
+				}
+			}
 			| DCL ';'
 			;
 
 DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 			{	
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
-				}else{
+				}
+				else{
 					$$.tipo = "int";
-					ctdDInt += 1;
+					$$.valor = "null";
 
 					$$.label = geraVarTemp($$.tipo);
 					$$.traducao = "";
@@ -252,18 +270,37 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
-			| TOKEN_INT TOKEN_NOMEVAR TOKEN_ATR E_BASICA MLTVAR_INT
+			| TOKEN_INT TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_INT
 			{
 
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
-				}else{
+				}
+				else{
 					$$.tipo = "int";
-					ctdDInt += 1;
+					$$.valor = $4.valor;
 
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n";
+					$$.traducao = $5.traducao + "\t" + $$.label + " = " + $4.traducao + ";\n" ;
+
+					mapaDeVariaveis[$2.label] = $$;
+				}
+
+			}
+			| TOKEN_INT TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_INT
+			{
+
+				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
+					exit(1);
+				}
+				else{
+					$$.tipo = "int";
+					$$.valor = $4.valor;
+
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n";
 
 					mapaDeVariaveis[$2.label] = $$;
 				}
@@ -272,11 +309,13 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 			| TOKEN_FLOAT TOKEN_NOMEVAR MLTVAR_FLOAT
 			{
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
-				}else{
+				}
+				else{
+					
 					$$.tipo = "float";
-					ctdDFloat += 1;
+					$$.valor = "null";					
 
 					$$.label = geraVarTemp($$.tipo);
 					$$.traducao = "";
@@ -284,18 +323,38 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 					mapaDeVariaveis[$2.label] = $$;
 				}	
 			}
-			| TOKEN_FLOAT TOKEN_NOMEVAR TOKEN_ATR E_BASICA MLTVAR_FLOAT
+			| TOKEN_FLOAT TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_FLOAT
 			{
 
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
-				}else{
+				}
+				else{
 					$$.tipo = "float";
-					ctdDFloat += 1;
+					$$.valor = $4.valor;
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $5.traducao + "\t" + $$.label + " = " + $4.traducao + ";\n";
+
+					mapaDeVariaveis[$2.label] = $$;
+				
+					
+				}
+
+			}
+			| TOKEN_FLOAT TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_FLOAT
+			{
+
+				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
+					exit(1);
+				}
+				else{
+					$$.tipo = "float";
+					$$.valor = $4.valor;
 
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n";
+					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n";
 
 					mapaDeVariaveis[$2.label] = $$;
 				}
@@ -304,11 +363,12 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 			| TOKEN_CHAR TOKEN_NOMEVAR MLTVAR_CHAR
 			{	
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
-				}else {
+				}
+				else {
 					$$.tipo = "char";
-					ctdDChar += 1;
+					$$.valor = "null";
 
 					$$.label = geraVarTemp($$.tipo);
 					$$.traducao = "";
@@ -317,31 +377,39 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 				}
 
 			}
-			| TOKEN_CHAR TOKEN_NOMEVAR TOKEN_ATR E_CARACTER MLTVAR_CHAR
+			| TOKEN_CHAR TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_CHAR
 			{
 
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
-				}else{
-					$$.tipo = "char";
-					ctdDChar += 1;
+				}
+				else{
+					if(tipoGeral == 2){
+						$$.tipo = "char";
+						$$.valor = $4.valor;
+						
+						$$.label = geraVarTemp($$.tipo);
+						$$.traducao = $5.traducao + "\t" + $$.label + " = " + $4.traducao + ";\n";
 
-					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n";
+						mapaDeVariaveis[$2.label] = $$;
+					}else{
+						std::cout <<MSG_ERRO_TIPO<< std::endl;
+						exit(1);
+					}
 
-					mapaDeVariaveis[$2.label] = $$;
 				}
 
 			}
 			| TOKEN_BOOL TOKEN_NOMEVAR MLTVAR_BOOL
 			{	
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
-				}else{
+				}
+				else{
 					$$.tipo = "bool";
-					ctdDBool += 1;
+					$$.valor = "null";
 
 					$$.label = geraVarTemp($$.tipo);
 					$$.traducao = "";
@@ -349,18 +417,45 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
-			| TOKEN_BOOL TOKEN_NOMEVAR TOKEN_ATR E_BOOLEAN MLTVAR_BOOL
+			| TOKEN_BOOL TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_BOOL
 			{
 
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
-				}else{
+				}
+				else{
+					if ($4.valor == "0" || $4.valor == "1"){
+						$$.tipo = "bool";
+						$$.valor = $4.valor;				
+
+						$$.label = geraVarTemp($$.tipo);
+						$$.traducao = $5.traducao + "\t" + $$.label + " = " + $4.traducao + ";\n";
+
+						mapaDeVariaveis[$2.label] = $$;	
+					}
+					else {
+						std::cout << MSG_ERRO_TIPO<< std::endl;
+						std::cout <<$4.valor<< std::endl;			
+						exit(1);
+					}
+					
+				}
+
+			}
+			| TOKEN_BOOL TOKEN_NOMEVAR TOKEN_ATR ERL MLTVAR_BOOL
+			{
+
+				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
+					exit(1);
+				}
+				else{
 					$$.tipo = "bool";
-					ctdDBool += 1;
+					$$.valor = $4.valor;
 
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n";
+					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n";
 
 					mapaDeVariaveis[$2.label] = $$;
 				}
@@ -371,11 +466,11 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 MLTVAR_INT	: ',' TOKEN_NOMEVAR MLTVAR_INT
 			{
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
 				}else {
 					$$.tipo = "int";
-					ctdDInt += 1;
+					$$.valor = "null";
 
 					$$.label = geraVarTemp($$.tipo);
 					$$.traducao = "";
@@ -383,32 +478,35 @@ MLTVAR_INT	: ',' TOKEN_NOMEVAR MLTVAR_INT
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
-			| ',' TOKEN_NOMEVAR TOKEN_ATR E_BASICA MLTVAR_INT
+			| ',' TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_INT
 			{
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
 				}else{
 					$$.tipo = "int";
-					ctdDInt += 1;
-
+					$$.valor = $4.valor;
+					
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n";
+					$$.traducao = "\t" + $$.label + " = " + $4.traducao + ";\n";
 
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
 			|
+			{
+				$$.traducao = "";
+			}
 			;
 
 MLTVAR_FLOAT: ',' TOKEN_NOMEVAR MLTVAR_FLOAT
 			{
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
 				}else {
 					$$.tipo = "float";
-					ctdDFloat += 1;
+					$$.valor = "null";
 
 					$$.label = geraVarTemp($$.tipo);
 					$$.traducao = "";
@@ -416,92 +514,101 @@ MLTVAR_FLOAT: ',' TOKEN_NOMEVAR MLTVAR_FLOAT
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
-			| ',' TOKEN_NOMEVAR TOKEN_ATR E_BASICA MLTVAR_FLOAT
+			| ',' TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_FLOAT
 			{
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
 				}else {
 					$$.tipo = "float";
-					ctdDFloat += 1;
+					$$.valor = $4.valor;
 
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $$.label + " = " + $4.traducao;
+					$$.traducao = "\t" + $$.label + " = " + $4.traducao + ";\n";
 					
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
 			|
+			{
+				$$.traducao = "";
+			}
 			;			
 
 MLTVAR_CHAR	: ',' TOKEN_NOMEVAR MLTVAR_CHAR
 			{
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
 				}else {
 					$$.tipo = "char";
-					ctdDChar += 1;
-
+					$$.valor = "null";
+					
 					$$.label = geraVarTemp($$.tipo);
 					$$.traducao = "";
 
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
-			| ',' TOKEN_NOMEVAR TOKEN_ATR E_CARACTER MLTVAR_CHAR
+			| ',' TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_CHAR
 			{
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
 				}else {
 					$$.tipo = "char";
-					ctdDChar += 1;
-
+					$$.valor = $4.valor;
+					
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $$.label + " = " + $4.traducao;
+					$$.traducao = "\t" + $$.label + " = " + $4.traducao + ";\n";
 					
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
 			|
+			{
+				$$.traducao = "";
+			}
 			;
 
 MLTVAR_BOOL : ',' TOKEN_NOMEVAR MLTVAR_BOOL
 			{
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
 				}else {
 					$$.tipo = "bool";
-					ctdDBool += 1;
-
+					$$.valor = "null";
+					
 					$$.label = geraVarTemp($$.tipo);
 					$$.traducao = "";
 
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
-			| ',' TOKEN_NOMEVAR TOKEN_ATR E_BOOLEAN MLTVAR_BOOL
+			| ',' TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_BOOL
 			{
 				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<"\n"<<MSG_ERRO<<"\nVariabile già dichiarata\n" << std::endl;
+					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
 					exit(1);
 				}else {
 					$$.tipo = "bool";
-					ctdDBool += 1;
+					$$.valor = $4.valor;
 
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $$.label + " = " + $4.traducao;
+					$$.traducao = "\t"  + $$.label + " = " + $4.traducao + ";\n";
 					
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
 			|
+			{
+				$$.traducao = "";
+			}
 			;			
 
 
-ERL         :'(' ERL ')'
+ERL         : '(' ERL ')'
 			{
 				$$.tipo = $2.tipo;
 				$$.label = $2.label;
@@ -509,82 +616,273 @@ ERL         :'(' ERL ')'
 			}
  			| ERL TOKEN_MAIOR ERL
 			{
-				$$.tipo = tabelaDeTipos($1.tipo, $3.tipo);
+				$$.tipo = "bool";
+				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
+				string theCasting = ""; 
 
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $1.traducao + $3.traducao + "\t" +
-				$$.label + " = " + $1.label + " > " + $3.label +
-				";\n";
+				if(fazCasting == 1){					
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + labelCasting + " > " + $3.label +
+					";\n";
+
+				}
+				else if(fazCasting == 2){
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + $1.label + " > " + labelCasting +
+					";\n";
+				}
+				else{		
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " > " + $3.label +
+					";\n";
+				}
+
 			}
 			| ERL TOKEN_MENOR ERL
 			{
-				$$.tipo = tabelaDeTipos($1.tipo, $3.tipo);
+				$$.tipo = "bool";
+				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
+				string theCasting = ""; 
 
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $1.traducao + $3.traducao + "\t" +
-				$$.label + " = " + $1.label + " < " + $3.label +
-				";\n";
+				if(fazCasting == 1){					
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + labelCasting + " < " + $3.label +
+					";\n";
+
+				}
+				else if(fazCasting == 2){
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + $1.label + " < " + labelCasting +
+					";\n";
+				}
+				else{		
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " < " + $3.label +
+					";\n";
+				}
 			}
 			| ERL TOKEN_MAIORIGUAL ERL
 			{
-				$$.tipo = tabelaDeTipos($1.tipo, $3.tipo);
+				$$.tipo = "bool";
+				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
+				string theCasting = ""; 
 
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $1.traducao + $3.traducao + "\t" +
-				$$.label + " = " + $1.label + " >= " + $3.label +
-				";\n";
+				if(fazCasting == 1){					
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + labelCasting + " >= " + $3.label +
+					";\n";
+
+				}
+				else if(fazCasting == 2){
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + $1.label + " >= " + labelCasting +
+					";\n";
+				}
+				else{		
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " >= " + $3.label +
+					";\n";
+				}
 			}
 			| ERL TOKEN_MENORIGUAL ERL
 			{
-				$$.tipo = tabelaDeTipos($1.tipo, $3.tipo);
+				$$.tipo = "bool";
+				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
+				string theCasting = ""; 
 
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $1.traducao + $3.traducao + "\t" +
-				$$.label + " = " + $1.label + " <= " + $3.label +
-				";\n";
+				if(fazCasting == 1){					
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + labelCasting + " <= " + $3.label +
+					";\n";
+
+				}
+				else if(fazCasting == 2){
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + $1.label + " <= " + labelCasting +
+					";\n";
+				}
+				else{		
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " <= " + $3.label +
+					";\n";
+				}
 			}
 			| ERL TOKEN_DIF ERL
 			{
-				$$.tipo = tabelaDeTipos($1.tipo, $3.tipo);
+				$$.tipo = "bool";
+				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
+				string theCasting = ""; 
 
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $1.traducao + $3.traducao + "\t" +
-				$$.label + " = " + $1.label + " != " + $3.label +
-				";\n";
+				if(fazCasting == 1){					
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + labelCasting + " != " + $3.label +
+					";\n";
+
+				}
+				else if(fazCasting == 2){
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + $1.label + " != " + labelCasting +
+					";\n";
+				}
+				else{		
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " != " + $3.label +
+					";\n";
+				}
 			}
 			| ERL TOKEN_IGUAL ERL
 			{
-				$$.tipo = tabelaDeTipos($1.tipo, $3.tipo);
+				$$.tipo = "bool";
+				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
+				string theCasting = ""; 
 
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $1.traducao + $3.traducao + "\t" +
-				$$.label + " = " + $1.label + " == " + $3.label +
-				";\n";
+				if(fazCasting == 1){					
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + labelCasting + " == " + $3.label +
+					";\n";
+
+				}
+				else if(fazCasting == 2){
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + $1.label + " == " + labelCasting +
+					";\n";
+				}
+				else{		
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " == " + $3.label +
+					";\n";
+				}
 			}
 			| ERL TOKEN_E ERL
 			{
-				$$.tipo = tabelaDeTipos($1.tipo, $3.tipo);
+				$$.tipo = "bool";
+				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
+				string theCasting = ""; 
 
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $1.traducao + $3.traducao + "\t" +
-				$$.label + " = " + $1.label + " && " + $3.label +
-				";\n";
+				if(fazCasting == 1){					
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + labelCasting + " && " + $3.label +
+					";\n";
+
+				}
+				else if(fazCasting == 2){
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + $1.label + " && " + labelCasting +
+					";\n";
+				}
+				else{		
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " && " + $3.label +
+					";\n";
+				}
 			}
 			| ERL TOKEN_OU ERL
 			{
-				$$.tipo = tabelaDeTipos($1.tipo, $3.tipo);
+				$$.tipo = "bool";
+				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
+				string theCasting = ""; 
 
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $1.traducao + $3.traducao + "\t" +
-				$$.label + " = " + $1.label + " || " + $3.label +
-				";\n";
+				if(fazCasting == 1){					
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + labelCasting + " || " + $3.label +
+					";\n";
+
+				}
+				else if(fazCasting == 2){
+					string labelCasting = geraVarTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + $1.label + " || " + labelCasting +
+					";\n";
+				}
+				else{		
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " || " + $3.label +
+					";\n";
+				}
 			}
 			| E_BASICA
-			{ }
-			| E_BOOLEAN
-			{ }
-			| E_CARACTER
-			{ }
+			{ 
+				$$.traducao = $1.traducao;
+			}
 			;	
 
 E 			: '(' E ')'
@@ -595,49 +893,176 @@ E 			: '(' E ')'
 			}
 			| E '+' E
 			{
-				$$.tipo = tabelaDeTipos($1.tipo, $3.tipo);
+				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
+				string theCasting = ""; 
 
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $1.traducao + $3.traducao + "\t" +
-				$$.label + " = " + $1.label + " + " + $3.label +
-				";\n";
+				if(fazCasting == 1){
+					$$.tipo = "float";
+					string labelCasting = geraVarTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + labelCasting + " + " + $3.label +
+					";\n";
+
+				}
+				else if(fazCasting == 2){
+					$$.tipo = "float";
+					string labelCasting = geraVarTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + $1.label + " + " + labelCasting +
+					";\n";
+				}
+				else if(fazCasting == 0){
+					$$.tipo = "int";
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " + " + $3.label +
+					";\n";
+				}
+				else{		
+					$$.tipo = "float";
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " + " + $3.label +
+					";\n";
+				}
+
 				
 			}
 			| E '-' E
 			{
-				$$.tipo = tabelaDeTipos($1.tipo, $3.tipo);
+				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
+				string theCasting = ""; 
 
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $1.traducao + $3.traducao + "\t" +
-				$$.label + " = " + $1.label + " - " + $3.label +
-				";\n";
+				if(fazCasting == 1){
+					$$.tipo = "float";
+					string labelCasting = geraVarTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + labelCasting + " - " + $3.label +
+					";\n";
+
+				}
+				else if(fazCasting == 2){
+					$$.tipo = "float";
+					string labelCasting = geraVarTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + $1.label + " - " + labelCasting +
+					";\n";
+				}
+				else if(fazCasting == 0){
+					$$.tipo = "int";
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " - " + $3.label +
+					";\n";
+				}
+				else{		
+					$$.tipo = "float";
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " - " + $3.label +
+					";\n";
+				}
 				
 			}
 			| E '*' E
 			{
-				$$.tipo = tabelaDeTipos($1.tipo, $3.tipo);
+				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
+				string theCasting = ""; 
 
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $1.traducao + $3.traducao + "\t" +
-				$$.label + " = " + $1.label + " * " + $3.label +
-				";\n";
+				if(fazCasting == 1){
+					$$.tipo = "float";
+					string labelCasting = geraVarTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + labelCasting + " * " + $3.label +
+					";\n";
+
+				}
+				else if(fazCasting == 2){
+					$$.tipo = "float";
+					string labelCasting = geraVarTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + $1.label + " * " + labelCasting +
+					";\n";
+				}
+				else if(fazCasting == 0){
+					$$.tipo = "int";
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " * " + $3.label +
+					";\n";
+				}
+				else{		
+					$$.tipo = "float";
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " * " + $3.label +
+					";\n";
+				}
 				
 			}
 			| E '/' E
 			{
-				$$.tipo = tabelaDeTipos($1.tipo, $3.tipo);
+				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
+				string theCasting = ""; 
 
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $1.traducao + $3.traducao + "\t" +
-				$$.label + " = " + $1.label + " / " + $3.label +
-				";\n";
-				
+				if(fazCasting == 1){
+					$$.tipo = "float";
+					string labelCasting = geraVarTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + labelCasting + " / " + $3.label +
+					";\n";
+
+				}
+				else if(fazCasting == 2){
+					$$.tipo = "float";
+					string labelCasting = geraVarTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
+					$$.label + " = " + $1.label + " / " + labelCasting +
+					";\n";
+				}
+				else if(fazCasting == 0){
+					$$.tipo = "int";
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " / " + $3.label +
+					";\n";
+				}
+				else{		
+					$$.tipo = "float";
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $1.traducao + $3.traducao + "\t" +
+					$$.label + " = " + $1.label + " / " + $3.label +
+					";\n";
+				}
 			}
 			| TOKEN_CONV_FLOAT E
 			{
 				$$.tipo = "float";
-				ctdDFloat += 1;
-
+				
 				$$.label = geraVarTemp($$.tipo);
 				$$.traducao = $2.traducao + "\t" + $$.label + " = (float) " + $2.label +
 				";\n";
@@ -645,8 +1070,7 @@ E 			: '(' E ')'
 			| TOKEN_CONV_INT E
 			{
 				$$.tipo = "int";
-				ctdDInt += 1;
-
+				
 				$$.label = geraVarTemp($$.tipo);
 				$$.traducao = $2.traducao + "\t" + $$.label + " = (int) " + $2.label +
 				";\n";
@@ -660,70 +1084,126 @@ E 			: '(' E ')'
 				";\n";			
 			}
 			| E_BASICA
-			{ }
-			| E_BOOLEAN
-			{ }
-			| E_CARACTER
-			{ }
+			{ 
+				$$.traducao = $1.traducao;
+			}
 			;
 
 E_BASICA	: TOKEN_NUM_INT
 			{
-				ctdDInt += 1;
 				$$.tipo = "int";
-
-
 				$$.label = geraVarTemp($$.tipo);
+				$$.valor = $1.traducao;
 				$$.traducao = "\t" + $$.label + " = " + $1.traducao +
 				";\n";
 			}
 			| TOKEN_NUM_FLOAT
 			{
-				ctdDFloat += 1;
 				$$.tipo = "float";
-
 				$$.label = geraVarTemp($$.tipo);
+				$$.valor = $1.traducao;
 				$$.traducao = "\t" + $$.label + " = " + $1.traducao +
 				";\n";
 			}
 			| TOKEN_NOMEVAR
 			{
-                $$.label = geraVarTemp("inteiro");
-                $$.traducao = "\t" + $$.label +" = " + $1.label + 
-                ";\n";
+
+                if(mapaDeVariaveis.find($1.label) != mapaDeVariaveis.end()){
+					if(mapaDeVariaveis[$1.label].tipo == "float" || mapaDeVariaveis[$1.label].tipo == "int"){
+
+						if(mapaDeVariaveis[$1.label].valor != "null"){						
+
+							$$.label = mapaDeVariaveis[$1.label].label;
+							$$.valor = mapaDeVariaveis[$1.label].valor;
+							$$.tipo = mapaDeVariaveis[$1.label].tipo;
+							$$.traducao = ""; //tenho que mexer aqui!!!!!
+
+						}
+						else{
+							std::cout <<"\n"<<MSG_ERRO<<"\nConteudo da variavel esta nulo\n" << std::endl;
+							exit(1);															
+						}
+					}
+					else{
+						std::cout <<MSG_ERRO_TIPO<< std::endl;
+						exit(1);									
+					}
+				}
+				else{
+					std::cout <<MSG_ERRO_NDECLARADA<< std::endl;
+					exit(1);									
+				}
+
+
+
 			}
-			;
-
-E_BOOLEAN	: TOKEN_BOOLEAN_FALSE
+			| TOKEN_BOOLEAN_FALSE
 			{
-				ctdDBool += 1;
 				$$.tipo = "bool";
-
 				$$.label = geraVarTemp($$.tipo);
+				$$.valor = $1.traducao;
 				$$.traducao = "\t" + $$.label + " = " + $1.traducao +
 				";\n";
 			}
 			| TOKEN_BOOLEAN_TRUE
 			{
-				ctdDBool += 1;
 				$$.tipo = "bool";
-
 				$$.label = geraVarTemp($$.tipo);
+				$$.valor = $1.traducao;
 				$$.traducao = "\t" + $$.label + " = " + $1.traducao +
 				";\n";
 			}
-			;
-E_CARACTER  : TOKEN_CARACTERE
+			| TOKEN_CARACTERE
 			{
-				ctdDChar += 1;
 				$$.tipo = "char";
-
-
 				$$.label = geraVarTemp($$.tipo);
+				$$.valor = $1.traducao;
 				$$.traducao = "\t" + $$.label + " = " + $1.traducao +
 				";\n";
 			}					
             ;
+
+E_ATR		: TOKEN_NUM_INT
+			{
+				tipoGeral = 1;
+				$$.tipo = "int";
+				$$.label = $1.label;
+				$$.valor = $1.traducao;
+				$$.traducao = $1.traducao;
+			}
+			| TOKEN_NUM_FLOAT
+			{
+				tipoGeral = 1;
+				$$.tipo = "float";
+				$$.label = $1.label;
+				$$.valor = $1.traducao;
+				$$.traducao = $1.traducao;
+			}
+			| TOKEN_BOOLEAN_FALSE
+			{
+				$$.tipo = "bool";
+				$$.label = $1.label;
+				$$.valor = "0";
+				$$.traducao = $1.traducao;
+			}
+			| TOKEN_BOOLEAN_TRUE
+			{
+				$$.tipo = "bool";
+				$$.label = $1.label;
+				$$.valor = "1";
+				$$.traducao = $1.traducao;
+			}
+			| TOKEN_CARACTERE
+			{
+				tipoGeral = 2;
+				$$.tipo = "char";
+				$$.label = $1.label;
+				$$.valor = $1.traducao;
+				$$.traducao = $1.traducao;
+			}				
+            ;
+
+
 %%
 
 #include "lex.yy.c"
