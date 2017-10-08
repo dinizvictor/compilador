@@ -40,6 +40,7 @@ BOOL [true]|[false]
 "rompere" 			{return TOKEN_BREAK;}
 "fare" 				{return TOKEN_DO;}
 "per" 				{return TOKEN_FOR;}
+"mentre"			{return TOKEN_WHILE;}
 
 "ritorno"			{return TOKEN_RETURN; }
 "stampare"			{return TOKEN_PRINT; }

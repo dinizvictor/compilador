@@ -8,8 +8,7 @@
 
 using namespace std;
 
-struct atributos
-{
+struct atributos{
 	string label;
 	string traducao;
 	string tipo;
@@ -22,6 +21,7 @@ string MSG_ERRO = "\nErrore:\n";
 string MSG_ERRO_TIPO = "\nErrore:\nTipo errato per variabile\n";
 string MSG_ERRO_NDECLARADA = "\nErrore:\nVariabile non dichiarata\n";
 string MSG_ERRO_DECLARADA = "\nErrore:\nVariabile già dichiarata\n";
+string MSG_ERRO_INICIALIZADA = "\nErrore:\nvariabile non inizializzata\n";
 
 void yyerror(string);
 
@@ -116,12 +116,55 @@ string geraLabelFinal(){
 
 	return declaracao + "\n";
 }
-bool variavelExistente(string variavel){
-	if(variavel != ""){
-		std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-		exit(1); 
+//'e' de encontrar - PARA SABER SE A VARIAVEL JA FOI DECLARADA 
+//'d' de declar - PARA SABER SE PODE DECLARAR 
+bool variavelExistente(string variavel, char opcao){
+	if(opcao == 'e'){
+		if(variavel != ""){
+			return true;
+		}else{
+			std::cout <<MSG_ERRO_NDECLARADA<< std::endl;
+			exit(1);	
+		}
+	}else if(opcao == 'd'){
+		if(variavel == ""){
+			return true;
+		}else{
+			std::cout <<MSG_ERRO_DECLARADA<< std::endl;
+			exit(1);	
+		}
 	}
-	return true;
+}
+
+string verificaErros(atributos $1, atributos $3, int opcao){
+	
+	if(opcao == 1){
+		if(variavelExistente(mapaDeVariaveis[$1.label].label,'e')){
+			if(mapaDeVariaveis[$1.label].tipo == "int" || mapaDeVariaveis[$1.label].tipo == "float"){
+				if(mapaDeVariaveis[$1.label].tipo != $3.tipo){											
+					std::cout <<MSG_ERRO_TIPO<< std::endl;
+					exit(1);		
+				}				
+				mapaDeVariaveis[$1.label].valor = $3.traducao;
+				string retorno = $3.traducao + "\t" + mapaDeVariaveis[$1.label].label + " = " + $3.label +";\n";
+				return retorno;
+			}else{
+				std::cout <<MSG_ERRO_TIPO<< std::endl;
+				exit(1);									
+			}					
+		}
+	}else if(opcao == 2){
+		if(variavelExistente(mapaDeVariaveis[$1.label].label, 'e')){
+			if(mapaDeVariaveis[$1.label].tipo == "bool"){
+				mapaDeVariaveis[$1.label].valor = $3.traducao;
+				string retorno = $3.traducao + "\t" + mapaDeVariaveis[$1.label].label + " = " + $3.label +";\n";
+				return retorno;
+			}else{
+				std::cout <<MSG_ERRO_TIPO<< std::endl;
+				exit(1);									
+			}
+		}
+	}	
 }
 
 %}
@@ -144,6 +187,7 @@ bool variavelExistente(string variavel){
 %token TOKEN_BREAK
 %token TOKEN_DO
 %token TOKEN_FOR
+%token TOKEN_WHILE
 %token TOKEN_RETURN
 %token TOKEN_PRINT
 %token TOKEN_ERROR
@@ -187,7 +231,7 @@ bool variavelExistente(string variavel){
 
 S		    : TOKEN_BEGIN TOKEN_MAIN '(' ')' BLOCO 
             {
-				cout << "/*Compilador ITL*/\n" << "#include <iostream>\n#include<string.h>\n#include<stdio.h>\nint main(void)\n{\n" <<
+				cout << "/*Compilador ITL*/\n" << "#include <iostream>\n#include<string.h>\n#include<stdio.h>\nint main(void){\n" <<
 				$5.traducao << "\treturn 0;\n}" << endl; 							
 			}
 			;
@@ -198,6 +242,11 @@ BLOCO		: '{' COMANDOS '}'
 				$$.traducao = $$.label + $2.traducao;
 			}
 			;
+BLOCO_WHILE	: '{' COMANDOS '}'
+			{
+				$$.traducao = $2.traducao;
+			}
+			;					
 
 COMANDOS	: COMANDO COMANDOS
 			{
@@ -211,96 +260,43 @@ COMANDOS	: COMANDO COMANDOS
 
 COMANDO 	: TOKEN_NOMEVAR TOKEN_ATR E ';' 
 			{
-				if(mapaDeVariaveis.find($1.label) != mapaDeVariaveis.end()){
-					if(mapaDeVariaveis[$1.label].tipo == "int" || mapaDeVariaveis[$1.label].tipo == "float"){
-						
-						string theCasting = "";
-						if(mapaDeVariaveis[$1.label].tipo != $3.tipo){											
-							mapaDeVariaveis[$1.label].tipo = "float";
-							string labelCasting = geraVarTemp(mapaDeVariaveis[$1.label].tipo);
-							theCasting = "\t" + labelCasting + " = (float) " + mapaDeVariaveis[$1.label].label + ";\n";
-							mapaDeVariaveis[$1.label].label = labelCasting;
-						}				
-						mapaDeVariaveis[$1.label].valor = $3.traducao;
-						$$.traducao = $3.traducao + theCasting + "\t" + mapaDeVariaveis[$1.label].label + " = " + $3.label +";\n";
-					}
-					else{
-						std::cout <<MSG_ERRO_TIPO<< std::endl;
-						exit(1);									
-					}					
-				}	
-				else {
-					std::cout <<MSG_ERRO_NDECLARADA<< std::endl;
-					exit(1);				
-				}
+				$$.traducao = verificaErros($1, $3, 1);
 			}
 			| TOKEN_NOMEVAR TOKEN_ATR ERL ';' 
 			{
-				if(mapaDeVariaveis.find($1.label) != mapaDeVariaveis.end()){
-					if(mapaDeVariaveis[$1.label].tipo == "bool"){
-						mapaDeVariaveis[$1.label].valor = $3.traducao;
-						$$.traducao = $3.traducao + "\t" + mapaDeVariaveis[$1.label].label + " = " + $3.label +";\n";
-					}
-					else{
-						std::cout <<MSG_ERRO_TIPO<< std::endl;
-						exit(1);									
-					}
-				}	
-				else {
-					std::cout <<MSG_ERRO_NDECLARADA<< std::endl;
-					exit(1);				
-				}
+				$$.traducao = verificaErros($1, $3, 2);
 			}
 			| DCL ';'
-			;
+			| WHILE
+			;			
 
 DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 			{	
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}
-				else{
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					$$.tipo = "int";
 					$$.valor = "null";
 
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = "";
+					$$.traducao = $3.traducao;
 
 					mapaDeVariaveis[$2.label] = $$;
 				}
-			}
-			| TOKEN_INT TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_INT
-			{
-
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}
-				else{
-					$$.tipo = "int";
-					$$.valor = $4.valor;
-
-					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $5.traducao + "\t" + $$.label + " = " + $4.traducao + ";\n" ;
-
-					mapaDeVariaveis[$2.label] = $$;
-				}
-
 			}
 			| TOKEN_INT TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_INT
 			{
-
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}
-				else{
+				
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					$$.tipo = "int";
-					$$.valor = $4.valor;
+					$$.valor = $4.valor;			
+
+					if($4.tipo != $$.tipo ){																
+						std::cout <<MSG_ERRO_TIPO<< std::endl;
+						exit(1);		
+					}				
 
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n";
+					$$.valor = $4.traducao;
+					$$.traducao = $4.traducao +  "\t" + $$.label + " = " + $4.label + ";\n" + $5.traducao; 
 
 					mapaDeVariaveis[$2.label] = $$;
 				}
@@ -308,53 +304,32 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 			}
 			| TOKEN_FLOAT TOKEN_NOMEVAR MLTVAR_FLOAT
 			{
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}
-				else{
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					
 					$$.tipo = "float";
-					$$.valor = "null";					
+					$$.valor = "null";		
 
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = "";
+					$$.traducao = $3.traducao;
 
 					mapaDeVariaveis[$2.label] = $$;
 				}	
 			}
-			| TOKEN_FLOAT TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_FLOAT
-			{
-
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}
-				else{
-					$$.tipo = "float";
-					$$.valor = $4.valor;
-					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $5.traducao + "\t" + $$.label + " = " + $4.traducao + ";\n";
-
-					mapaDeVariaveis[$2.label] = $$;
-				
-					
-				}
-
-			}
 			| TOKEN_FLOAT TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_FLOAT
 			{
 
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}
-				else{
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+
 					$$.tipo = "float";
 					$$.valor = $4.valor;
 
+					if($4.tipo != $$.tipo ){																
+						std::cout <<MSG_ERRO_TIPO<< std::endl;
+						exit(1);		
+					}
+
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n";
+					$$.traducao = $4.traducao +  "\t" + $$.label + " = " + $4.label + ";\n" + $5.traducao; 
 
 					mapaDeVariaveis[$2.label] = $$;
 				}
@@ -362,35 +337,32 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 			}
 			| TOKEN_CHAR TOKEN_NOMEVAR MLTVAR_CHAR
 			{	
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}
-				else {
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					$$.tipo = "char";
 					$$.valor = "null";
 
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = "";
+					$$.traducao = $3.traducao;
 
 					mapaDeVariaveis[$2.label] = $$;
 				}
 
 			}
-			| TOKEN_CHAR TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_CHAR
+			| TOKEN_CHAR TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_CHAR
 			{
 
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}
-				else{
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					if(tipoGeral == 2){
 						$$.tipo = "char";
 						$$.valor = $4.valor;
+
+						if($4.tipo != $$.tipo ){																
+							std::cout <<MSG_ERRO_TIPO<< std::endl;
+							exit(1);		
+						}
 						
 						$$.label = geraVarTemp($$.tipo);
-						$$.traducao = $5.traducao + "\t" + $$.label + " = " + $4.traducao + ";\n";
+						$$.traducao = $4.traducao +  "\t" + $$.label + " = " + $4.label + ";\n" + $5.traducao; 
 
 						mapaDeVariaveis[$2.label] = $$;
 					}else{
@@ -403,34 +375,32 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 			}
 			| TOKEN_BOOL TOKEN_NOMEVAR MLTVAR_BOOL
 			{	
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}
-				else{
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					$$.tipo = "bool";
 					$$.valor = "null";
 
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = "";
+					$$.traducao = $3.traducao;
 
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
-			| TOKEN_BOOL TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_BOOL
+			| TOKEN_BOOL TOKEN_NOMEVAR TOKEN_ATR ERL MLTVAR_BOOL
 			{
 
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}
-				else{
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					if ($4.valor == "0" || $4.valor == "1"){
 						$$.tipo = "bool";
 						$$.valor = $4.valor;				
 
+						
+						if($4.tipo != $$.tipo ){																
+							std::cout <<MSG_ERRO_TIPO<< std::endl;
+							exit(1);		
+						}
+
 						$$.label = geraVarTemp($$.tipo);
-						$$.traducao = $5.traducao + "\t" + $$.label + " = " + $4.traducao + ";\n";
+						$$.traducao = $4.traducao +  "\t" + $$.label + " = " + $4.label + ";\n" + $5.traducao; 
 
 						mapaDeVariaveis[$2.label] = $$;	
 					}
@@ -443,32 +413,11 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 				}
 
 			}
-			| TOKEN_BOOL TOKEN_NOMEVAR TOKEN_ATR ERL MLTVAR_BOOL
-			{
-
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}
-				else{
-					$$.tipo = "bool";
-					$$.valor = $4.valor;
-
-					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n";
-
-					mapaDeVariaveis[$2.label] = $$;
-				}
-
-			}
-			;
+			
 
 MLTVAR_INT	: ',' TOKEN_NOMEVAR MLTVAR_INT
 			{
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}else {
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					$$.tipo = "int";
 					$$.valor = "null";
 
@@ -478,17 +427,20 @@ MLTVAR_INT	: ',' TOKEN_NOMEVAR MLTVAR_INT
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
-			| ',' TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_INT
+			| ',' TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_INT
 			{
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}else{
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					$$.tipo = "int";
 					$$.valor = $4.valor;
-					
+
+					if($4.tipo != $$.tipo ){																
+						std::cout << MSG_ERRO_TIPO<< std::endl;
+						exit(1);		
+					}				
+								
+
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = "\t" + $$.label + " = " + $4.traducao + ";\n";
+					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n" ;
 
 					mapaDeVariaveis[$2.label] = $$;
 				}
@@ -501,10 +453,7 @@ MLTVAR_INT	: ',' TOKEN_NOMEVAR MLTVAR_INT
 
 MLTVAR_FLOAT: ',' TOKEN_NOMEVAR MLTVAR_FLOAT
 			{
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}else {
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					$$.tipo = "float";
 					$$.valor = "null";
 
@@ -514,17 +463,14 @@ MLTVAR_FLOAT: ',' TOKEN_NOMEVAR MLTVAR_FLOAT
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
-			| ',' TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_FLOAT
+			| ',' TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_FLOAT
 			{
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}else {
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					$$.tipo = "float";
 					$$.valor = $4.valor;
 
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = "\t" + $$.label + " = " + $4.traducao + ";\n";
+					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n" ;
 					
 					mapaDeVariaveis[$2.label] = $$;
 				}
@@ -537,10 +483,7 @@ MLTVAR_FLOAT: ',' TOKEN_NOMEVAR MLTVAR_FLOAT
 
 MLTVAR_CHAR	: ',' TOKEN_NOMEVAR MLTVAR_CHAR
 			{
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}else {
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					$$.tipo = "char";
 					$$.valor = "null";
 					
@@ -550,17 +493,14 @@ MLTVAR_CHAR	: ',' TOKEN_NOMEVAR MLTVAR_CHAR
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
-			| ',' TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_CHAR
+			| ',' TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_CHAR
 			{
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}else {
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					$$.tipo = "char";
 					$$.valor = $4.valor;
 					
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = "\t" + $$.label + " = " + $4.traducao + ";\n";
+					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n" ;
 					
 					mapaDeVariaveis[$2.label] = $$;
 				}
@@ -573,10 +513,7 @@ MLTVAR_CHAR	: ',' TOKEN_NOMEVAR MLTVAR_CHAR
 
 MLTVAR_BOOL : ',' TOKEN_NOMEVAR MLTVAR_BOOL
 			{
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}else {
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					$$.tipo = "bool";
 					$$.valor = "null";
 					
@@ -586,17 +523,14 @@ MLTVAR_BOOL : ',' TOKEN_NOMEVAR MLTVAR_BOOL
 					mapaDeVariaveis[$2.label] = $$;
 				}
 			}
-			| ',' TOKEN_NOMEVAR TOKEN_ATR E_ATR MLTVAR_BOOL
+			| ',' TOKEN_NOMEVAR TOKEN_ATR ERL MLTVAR_BOOL
 			{
-				if(mapaDeVariaveis.find($2.label) != mapaDeVariaveis.end()){
-					std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-					exit(1);
-				}else {
+				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
 					$$.tipo = "bool";
 					$$.valor = $4.valor;
 
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = "\t"  + $$.label + " = " + $4.traducao + ";\n";
+					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n" ;
 					
 					mapaDeVariaveis[$2.label] = $$;
 				}
@@ -607,6 +541,11 @@ MLTVAR_BOOL : ',' TOKEN_NOMEVAR MLTVAR_BOOL
 			}
 			;			
 
+WHILE 		: TOKEN_WHILE '(' ERL ')' BLOCO_WHILE
+			{
+				$$.traducao = "\n\twhile ("+$3.label+"){\n"+$5.traducao+"\t}\n";
+			}
+			;
 
 ERL         : '(' ERL ')'
 			{
@@ -1091,6 +1030,7 @@ E 			: '(' E ')'
 
 E_BASICA	: TOKEN_NUM_INT
 			{
+				tipoGeral = 1;
 				$$.tipo = "int";
 				$$.label = geraVarTemp($$.tipo);
 				$$.valor = $1.traducao;
@@ -1099,6 +1039,7 @@ E_BASICA	: TOKEN_NUM_INT
 			}
 			| TOKEN_NUM_FLOAT
 			{
+				tipoGeral = 1;
 				$$.tipo = "float";
 				$$.label = geraVarTemp($$.tipo);
 				$$.valor = $1.traducao;
@@ -1116,11 +1057,11 @@ E_BASICA	: TOKEN_NUM_INT
 							$$.label = mapaDeVariaveis[$1.label].label;
 							$$.valor = mapaDeVariaveis[$1.label].valor;
 							$$.tipo = mapaDeVariaveis[$1.label].tipo;
-							$$.traducao = ""; //tenho que mexer aqui!!!!!
+							$$.traducao = ""; 
 
 						}
 						else{
-							std::cout <<"\n"<<MSG_ERRO<<"\nConteudo da variavel esta nulo\n" << std::endl;
+							std::cout <<mapaDeVariaveis[$1.label].label<<MSG_ERRO_INICIALIZADA << std::endl;
 							exit(1);															
 						}
 					}
@@ -1141,66 +1082,27 @@ E_BASICA	: TOKEN_NUM_INT
 			{
 				$$.tipo = "bool";
 				$$.label = geraVarTemp($$.tipo);
-				$$.valor = $1.traducao;
-				$$.traducao = "\t" + $$.label + " = " + $1.traducao +
+				$$.valor = "0";
+				$$.traducao = "\t" + $$.label + " = " + $$.valor +
 				";\n";
 			}
 			| TOKEN_BOOLEAN_TRUE
 			{
 				$$.tipo = "bool";
 				$$.label = geraVarTemp($$.tipo);
-				$$.valor = $1.traducao;
-				$$.traducao = "\t" + $$.label + " = " + $1.traducao +
+				$$.valor = "1";
+				$$.traducao = "\t" + $$.label + " = " + $$.valor +
 				";\n";
 			}
 			| TOKEN_CARACTERE
 			{
+				tipoGeral = 2;
 				$$.tipo = "char";
 				$$.label = geraVarTemp($$.tipo);
 				$$.valor = $1.traducao;
 				$$.traducao = "\t" + $$.label + " = " + $1.traducao +
 				";\n";
 			}					
-            ;
-
-E_ATR		: TOKEN_NUM_INT
-			{
-				tipoGeral = 1;
-				$$.tipo = "int";
-				$$.label = $1.label;
-				$$.valor = $1.traducao;
-				$$.traducao = $1.traducao;
-			}
-			| TOKEN_NUM_FLOAT
-			{
-				tipoGeral = 1;
-				$$.tipo = "float";
-				$$.label = $1.label;
-				$$.valor = $1.traducao;
-				$$.traducao = $1.traducao;
-			}
-			| TOKEN_BOOLEAN_FALSE
-			{
-				$$.tipo = "bool";
-				$$.label = $1.label;
-				$$.valor = "0";
-				$$.traducao = $1.traducao;
-			}
-			| TOKEN_BOOLEAN_TRUE
-			{
-				$$.tipo = "bool";
-				$$.label = $1.label;
-				$$.valor = "1";
-				$$.traducao = $1.traducao;
-			}
-			| TOKEN_CARACTERE
-			{
-				tipoGeral = 2;
-				$$.tipo = "char";
-				$$.label = $1.label;
-				$$.valor = $1.traducao;
-				$$.traducao = $1.traducao;
-			}				
             ;
 
 

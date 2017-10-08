@@ -1,4 +1,12 @@
 iniziare principale(){
-	tutto a;
-	a = 1.0 + 1;
+	tutto a = 1 + 2, b = 9;
+	carat c = 'o', d = 'a';
+	reale gatuso = 5.5, giorno = 0.98;
+	boole y = false, i = true;
+
+	mentre ( 1 < 2){
+		reale x = gatuso + giorno;
+		carat o = 'a';
+
+	}
 }
