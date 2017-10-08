@@ -1939,7 +1939,7 @@ yyreduce:
   case 31:
 #line 545 "sintatica.y" /* yacc.c:1646  */
     {
-				(yyval).traducao = "\n\twhile ("+(yyvsp[-2]).label+"){\n"+(yyvsp[0]).traducao+"\t}\n";
+				(yyval).traducao = "\n\tWHILE:\n\tif("+(yyvsp[-2]).label+"){\n"+(yyvsp[0]).traducao+"\tif("+(yyvsp[-2]).label+") goto WHILE;\n\t}\n";
 			}
 #line 1945 "y.tab.c" /* yacc.c:1646  */
     break;

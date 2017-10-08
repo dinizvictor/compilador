@@ -543,7 +543,7 @@ MLTVAR_BOOL : ',' TOKEN_NOMEVAR MLTVAR_BOOL
 
 WHILE 		: TOKEN_WHILE '(' ERL ')' BLOCO_WHILE
 			{
-				$$.traducao = "\n\twhile ("+$3.label+"){\n"+$5.traducao+"\t}\n";
+				$$.traducao = "\n\tWHILE:\n\tif("+$3.label+"){\n"+$5.traducao+"\tif("+$3.label+") goto WHILE;\n\t}\n";
 			}
 			;
 
