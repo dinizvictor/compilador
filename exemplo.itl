@@ -11,8 +11,9 @@ iniziare principale(){
 
 	se (3 > 2){
 		tutto l = 2;
-	}
-	altri{
-		tutto m = 1;
+	} altrise (4 > 5){
+		reale k = 99.8;
+	} altri{
+		boole m = false;
 	}
 }

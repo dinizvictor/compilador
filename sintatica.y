@@ -182,6 +182,7 @@ string verificaErros(atributos $1, atributos $3, int opcao){
 %token TOKEN_VOID
 %token TOKEN_IF
 %token TOKEN_ELSE
+%token TOKEN_ELSEIF
 %token TOKEN_SWITCH
 %token TOKEN_CASE
 %token TOKEN_BREAK
@@ -550,30 +551,63 @@ IF 			: TOKEN_IF '(' ERL ')' BLOCO_IF
 			{		
 					$$.tipo = "bool";
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $3.traducao +
-					"\t" + $$.label + " = !" + $3.label + ";\n" +
-					"\t" + "if(" + $$.label + ") goto FIM_IF" + ";\n" +
+					$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
+					"\t" + $$.label + " = " + $3.label + ";\n" +
+					"\tif(!" + $$.label + ") goto FIM_IF;\n" +
 					$5.traducao +
-					"\t" + "FIM_IF:" + "\n";
-
+					"\n\tFIM_IF:\n\t//IF TERMINA\n\n";
+			}
+			| TOKEN_IF '(' ERL ')' BLOCO_IF ELSEIF
+			{
+					$$.tipo = "bool";
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
+					"\t" + $$.label + " = " + $3.label + ";\n" +
+					"\tif(!" + $$.label + ") goto ELSEIF:;\n" +
+					$5.traducao + $6.traducao;
 			}
 			| TOKEN_IF '(' ERL ')' BLOCO_IF TOKEN_ELSE BLOCO_IF
 			{
 					$$.tipo = "bool";
 					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $3.traducao +
+					$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
 					"\t" + $$.label + " = " + $3.label + ";\n" +
-					"\n\t" + "if(!" + $$.label + ") goto ELSE" + ";\n" +
+					"\tif(!" + $$.label + ") goto ELSE;\n" +
 					$5.traducao +
-					"\n\t" + "ELSE:" + "\n" + $7.traducao;
+					"\n\t//ELSE COMEÇA\n\tELSE:\n" + $7.traducao+"\t//ELSE TERMINA\n\t//IF TERMINA\n\n";
 			}
+			;
+
+ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO_IF
+			{		
+					$$.tipo = "bool";
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = "\n\t//ELSEIF COMEÇA\n\tELSEIF:\n"+$3.traducao +
+					"\t" + $$.label + " = " + $3.label + ";\n" +
+					"\tif(!" + $$.label + ") goto FIM_ELSEIF;\n" +
+					$5.traducao +
+					"\n\tFIM_ELSEIF:\n\t//ELSEIF TERMINA\n\t//IF TERMINA\n\n";
+
+			}
+			| TOKEN_ELSEIF '(' ERL ')' BLOCO_IF TOKEN_ELSE BLOCO_IF
+			{
+					$$.tipo = "bool";
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = "\n\t//ELSEIF COMEÇA\n\tELSEIF:\n"+$3.traducao +
+					"\t" + $$.label + " = " + $3.label + ";\n" +
+					"\tif(!" + $$.label + ") goto ELSE;\n" +
+					$5.traducao +
+					"\n\t//ELSE COMEÇA\n\tELSE:\n" + $7.traducao+"\t//ELSE TERMINA\n\t//ELSEIF TERMINA\n\t//IF TERMINA\n\n";
+			}
+			;
+
 WHILE 		: TOKEN_WHILE '(' ERL ')' BLOCO_WHILE
 			{	
 				$$.tipo = "bool";
 				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $3.traducao +
-					"\t" + $$.label + " = !" + $3.label + ";\n" +
-					"\t" + "\n\tif("+$3.label+"){\n\tWHILE:\n"+$5.traducao+"\t}if("+$3.label+") goto WHILE;\n\t\n";
+				$$.traducao = "\n\t//WHILE COMEÇA\n"+ $3.traducao +
+					"\t" + $$.label + " = " + $3.label + ";\n" +
+					"\t" + "if("+$3.label+"){\n\tWHILE:\n"+$5.traducao+"\t}if("+$3.label+") goto WHILE;\n\t//WHILE TERMINA\n";
 			}
 			;
 

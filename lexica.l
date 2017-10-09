@@ -34,6 +34,7 @@ BOOL [true]|[false]
 
 "se"				{return TOKEN_IF;}
 "altri"				{return TOKEN_ELSE;}
+"altrise"			{return TOKEN_ELSEIF;}
 "scelta"			{return TOKEN_SWITCH;}
 "caso"				{return TOKEN_CASE;}
 
