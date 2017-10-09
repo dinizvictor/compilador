@@ -573,8 +573,9 @@ IF 			: TOKEN_IF '(' ERL ')' BLOCO_IF
 					$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
 					"\t" + $$.label + " = " + $3.label + ";\n" +
 					"\tif(!" + $$.label + ") goto ELSE;\n" +
-					$5.traducao +
-					"\n\t//ELSE COMEÇA\n\tELSE:\n" + $7.traducao+"\t//ELSE TERMINA\n\t//IF TERMINA\n\n";
+					$5.traducao +"\tgoto FIM_ELSE;\n"+
+					"\n\t//ELSE COMEÇA\n\tELSE:\n" + $7.traducao+"\tFIM_ELSE:\n\t//ELSE TERMINA\n\t"+
+					"//IF TERMINA\n\n";
 			}
 			;
 
@@ -585,7 +586,7 @@ ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO_IF
 					$$.traducao = "\n\t//ELSEIF COMEÇA\n\tELSEIF:\n"+$3.traducao +
 					"\t" + $$.label + " = " + $3.label + ";\n" +
 					"\tif(!" + $$.label + ") goto FIM_ELSEIF;\n" +
-					$5.traducao +
+					$5.traducao + 
 					"\n\tFIM_ELSEIF:\n\t//ELSEIF TERMINA\n\t//IF TERMINA\n\n";
 
 			}
@@ -596,8 +597,9 @@ ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO_IF
 					$$.traducao = "\n\t//ELSEIF COMEÇA\n\tELSEIF:\n"+$3.traducao +
 					"\t" + $$.label + " = " + $3.label + ";\n" +
 					"\tif(!" + $$.label + ") goto ELSE;\n" +
-					$5.traducao +
-					"\n\t//ELSE COMEÇA\n\tELSE:\n" + $7.traducao+"\t//ELSE TERMINA\n\t//ELSEIF TERMINA\n\t//IF TERMINA\n\n";
+					$5.traducao + "\tgoto FIM_ELSE;\n"+
+					"\n\t//ELSE COMEÇA\n\tELSE:\n" + $7.traducao+"\tFIM_ELSE:\n\t//ELSE TERMINA\n\t"+
+					"//ELSEIF TERMINA\n\t//IF TERMINA\n\n";
 			}
 			;
 
