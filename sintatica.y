@@ -246,7 +246,12 @@ BLOCO_WHILE	: '{' COMANDOS '}'
 			{
 				$$.traducao = $2.traducao;
 			}
-			;					
+			;
+BLOCO_IF	: '{' COMANDOS '}'
+			{
+				$$.traducao = $2.traducao;
+			}
+			;										
 
 COMANDOS	: COMANDO COMANDOS
 			{
@@ -267,6 +272,7 @@ COMANDO 	: TOKEN_NOMEVAR TOKEN_ATR E ';'
 				$$.traducao = verificaErros($1, $3, 2);
 			}
 			| DCL ';'
+			| IF
 			| WHILE
 			;			
 
@@ -540,10 +546,34 @@ MLTVAR_BOOL : ',' TOKEN_NOMEVAR MLTVAR_BOOL
 				$$.traducao = "";
 			}
 			;			
+IF 			: TOKEN_IF '(' ERL ')' BLOCO_IF
+			{		
+					$$.tipo = "bool";
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $3.traducao +
+					"\t" + $$.label + " = !" + $3.label + ";\n" +
+					"\t" + "if(" + $$.label + ") goto FIM_IF" + ";\n" +
+					$5.traducao +
+					"\t" + "FIM_IF:" + "\n";
 
-WHILE 		: TOKEN_WHILE '(' ERL ')' BLOCO_WHILE
+			}
+			| TOKEN_IF '(' ERL ')' BLOCO_IF TOKEN_ELSE BLOCO_IF
 			{
-				$$.traducao = "\n\tWHILE:\n\tif("+$3.label+"){\n"+$5.traducao+"\tif("+$3.label+") goto WHILE;\n\t}\n";
+					$$.tipo = "bool";
+					$$.label = geraVarTemp($$.tipo);
+					$$.traducao = $3.traducao +
+					"\t" + $$.label + " = " + $3.label + ";\n" +
+					"\n\t" + "if(!" + $$.label + ") goto ELSE" + ";\n" +
+					$5.traducao +
+					"\n\t" + "ELSE:" + "\n" + $7.traducao;
+			}
+WHILE 		: TOKEN_WHILE '(' ERL ')' BLOCO_WHILE
+			{	
+				$$.tipo = "bool";
+				$$.label = geraVarTemp($$.tipo);
+				$$.traducao = $3.traducao +
+					"\t" + $$.label + " = !" + $3.label + ";\n" +
+					"\t" + "\n\tif("+$3.label+"){\n\tWHILE:\n"+$5.traducao+"\t}if("+$3.label+") goto WHILE;\n\t\n";
 			}
 			;
 

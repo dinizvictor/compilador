@@ -7,6 +7,12 @@ iniziare principale(){
 	mentre ( 1 < 2){
 		reale x = gatuso + giorno;
 		carat o = 'a';
+	}
 
+	se (3 > 2){
+		tutto l = 2;
+	}
+	altri{
+		tutto m = 1;
 	}
 }
