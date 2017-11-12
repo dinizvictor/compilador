@@ -1,19 +1,12 @@
 iniziare principale(){
-	tutto a = 1 + 2, b = 9;
-	carat c = 'o', d = 'a';
-	reale gatuso = 5.5, giorno = 0.98;
-	boole y = false, i = true;
-
-	mentre ( 1 < 2){
-		reale x = gatuso + giorno;
-		carat o = 'a';
+	
+	tutto a, b;
+	a = 2;
+	se(1 > 2){
+		a = 3;
+		
 	}
-
-	se (3 > 2){
-		tutto l = 2;
-	} altrise (4 > 5){
-		reale k = 99.8;
-	} altri{
-		boole m = false;
+	se(1 > 2){
+		a = 3;
 	}
 }

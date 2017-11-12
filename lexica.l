@@ -16,7 +16,7 @@ BOOL [true]|[false]
 
 %%
 
-"\n"				{}
+"\n"				{contaLinha();}
 {DELIMITADOR}		{}
 "principale"		{return TOKEN_MAIN;}
 "iniziare"			{return TOKEN_BEGIN;}
@@ -67,13 +67,14 @@ BOOL [true]|[false]
 "false"				{yylval.traducao = yytext; return TOKEN_BOOLEAN_FALSE; }
 "true"				{yylval.traducao = yytext; return TOKEN_BOOLEAN_TRUE; }
 
-
-[(){}[\];,]			{ return *yytext; }	
+[{]					{ empilhaMapa(); return *yytext; }
+[}]					{ desempilhaMapa(); return *yytext; }
+[()[\];,]			{ return *yytext; }	
 [+\-*/]				{ return *yytext; }
 {NUM}			    { yylval.traducao = yytext; return TOKEN_NUM_INT; }
 {REAL}				{ yylval.traducao = yytext; return TOKEN_NUM_FLOAT; }
 {CARACTER}			{ yylval.traducao = yytext; return TOKEN_CARACTERE; }
-{NOMEVAR}			{ yylval.label = yytext; return TOKEN_NOMEVAR; }
+{NOMEVAR}			{ yylval.nomeVariavel = yytext; return TOKEN_NOMEVAR; }
 .					{ *yytext; }
 
 %%

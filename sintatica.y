@@ -3,17 +3,52 @@
 #include <string>
 #include <sstream>
 #include <map>
+#include <stack>
 
-#define YYSTYPE atributos
+#define YYSTYPE Atributos
 
 using namespace std;
 
-struct atributos{
-	string label;
+struct Atributos{
+	string nomeVariavel;
+	string labelTemp;
 	string traducao;
 	string tipo;
 	string valor;
 };
+
+typedef	std::map<string,Atributos> MapaDeVariaveis;
+
+struct Contexto{
+	MapaDeVariaveis mapa;
+	bool interrompivel;
+	string labelInicio;
+	string labelFim;
+};
+
+struct Erro{
+	string mensagem;
+	int linha;
+};
+
+typedef std::stack<Contexto> PilhaContexto;
+
+
+static PilhaContexto pilhaDeContextos;
+
+void empilhaMapa(){
+
+	Contexto c;
+	pilhaDeContextos.push(c);
+	printf("{\n");
+
+}
+
+void desempilhaMapa(){
+
+	pilhaDeContextos.pop();
+	
+}
 
 int yylex(void);
 
@@ -28,8 +63,17 @@ void yyerror(string);
 static int ctdDInt = 0, ctdDFloat = 0, ctdDChar = 0, ctdDBool = 0;
 static int fazCasting;
 static int tipoGeral;
+static int ctdLinhas = 1;
 
-static std::map<string,atributos> mapaDeVariaveis; 
+void indicaErro(string MSG){
+
+	std::cout<<MSG<<std::endl<<"Linea "<<ctdLinhas<<std::endl;
+
+}
+
+void contaLinha(){
+	ctdLinhas++;
+}
 
 int tabelaDeTipos(string tipo1, string tipo2){
 
@@ -47,7 +91,21 @@ int tabelaDeTipos(string tipo1, string tipo2){
 	}
 }
 
-string geraVarTemp(string tipo){
+void adicionaVariavelContexto(Atributos a){
+
+	pilhaDeContextos.top().mapa[a.nomeVariavel] = a;
+
+}
+
+void criarContexto(bool interrompivel, string labelI, string labelF){
+
+	pilhaDeContextos.top().interrompivel = interrompivel;
+	pilhaDeContextos.top().labelInicio = labelI;
+	pilhaDeContextos.top().labelFim = labelF;
+
+}
+
+string geraLabelTemp(string tipo){
 
 	static int nI = 0, nF = 0, nC = 0, nB = 0;
 	
@@ -116,55 +174,219 @@ string geraLabelFinal(){
 
 	return declaracao + "\n";
 }
-//'e' de encontrar - PARA SABER SE A VARIAVEL JA FOI DECLARADA 
-//'d' de declar - PARA SABER SE PODE DECLARAR 
-bool variavelExistente(string variavel, char opcao){
-	if(opcao == 'e'){
-		if(variavel != ""){
-			return true;
-		}else{
-			std::cout <<MSG_ERRO_NDECLARADA<< std::endl;
-			exit(1);	
-		}
-	}else if(opcao == 'd'){
-		if(variavel == ""){
-			return true;
-		}else{
-			std::cout <<MSG_ERRO_DECLARADA<< std::endl;
-			exit(1);	
-		}
+
+void atualizarPilhaContextos(Atributos a){
+	
+	bool achou = 0;
+	PilhaContexto pilhaAux;
+	string variavel = pilhaDeContextos.top().mapa[a.nomeVariavel].labelTemp;
+	if(variavel != ""){
+		pilhaDeContextos.top().mapa[a.nomeVariavel] = a;
 	}
+	else if(pilhaDeContextos.size() > 1){
+		pilhaAux.push(pilhaDeContextos.top());
+		
+		pilhaDeContextos.pop();
+
+		do{
+
+			variavel = pilhaDeContextos.top().mapa[a.nomeVariavel].labelTemp;
+			cout<<variavel<<endl;
+			if(variavel != ""){
+				
+				pilhaDeContextos.top().mapa[a.nomeVariavel] = a;
+				achou = 1;
+
+			}
+			
+
+			pilhaAux.push(pilhaDeContextos.top());
+			pilhaDeContextos.pop();
+			
+
+		}while(pilhaDeContextos.size() > 0 || !achou);
+		
+		//Retornando os contextos para a pilhaDeContextos...
+
+		while(!pilhaAux.empty()){
+			
+			pilhaDeContextos.push(pilhaAux.top());
+			pilhaAux.pop();
+			printf("%d\n", pilhaDeContextos.size());
+
+		}
+
+	}
+
 }
 
-string verificaErros(atributos $1, atributos $3, int opcao){
+Contexto retornarContextoDaVariavel(string nomeVariavel){
+	Contexto c;
+	string variavel = pilhaDeContextos.top().mapa[nomeVariavel].labelTemp;
+	if(variavel != ""){
+		c = pilhaDeContextos.top();
+		return c;
+	}
+	else if(pilhaDeContextos.size() > 1){
+		PilhaContexto copiaPilha;
+		copiaPilha = pilhaDeContextos;
+		copiaPilha.pop();
+		do{
+
+			c = copiaPilha.top();
+			variavel = c.mapa[nomeVariavel].labelTemp;
+			if(variavel != ""){
+				
+				return c;
+			}
+			copiaPilha.pop();
+
+		}while(copiaPilha.size() > 1);
+
+	}
+
+	return c;
+
+}
+
+//'e' de encontrar - PARA SABER SE A VARIAVEL JA FOI DECLARADA 
+//'d' de declarar - PARA SABER SE PODE DECLARAR 
+
+bool verificaNosContextosAnteriores(string nomeVariavel, char opcao){
+	string variavel;
+	cout<<nomeVariavel<<endl;
+	if(opcao == 'e'){
+		PilhaContexto copiaPilha;
+		copiaPilha = pilhaDeContextos;
+		copiaPilha.pop();
+		
+		Contexto c;
+		do{
+
+			variavel = copiaPilha.top().mapa[nomeVariavel].nomeVariavel; //Verifica novamente
+			c = copiaPilha.top();
+			variavel = c.mapa[nomeVariavel].nomeVariavel;
+			if(variavel != ""){
+				return true;
+			}
+			copiaPilha.pop();
+		
+		}while(copiaPilha.size() > 1);
+
+		return false;
+
+	}
+	else if(opcao == 'd'){
+		PilhaContexto copiaPilha;
+		copiaPilha = pilhaDeContextos;
+		copiaPilha.pop();
+		
+		Contexto c;
+		do{
+			
+			variavel = copiaPilha.top().mapa[nomeVariavel].nomeVariavel; //Verifica novamente
+			c = copiaPilha.top(); 
+			variavel = c.mapa[nomeVariavel].nomeVariavel;
+			if(variavel == ""){
+				return true;
+			}
+			copiaPilha.pop();
+
+		}while(copiaPilha.size() > 1);
+
+		return false;
+	}
+
+}
+
+bool variavelExistente(string nomeVariavel, char opcao){
+
+	string variavel = pilhaDeContextos.top().mapa[nomeVariavel].nomeVariavel;
 	
+		if(opcao == 'e'){
+			if(variavel != ""){
+				return true;
+			}
+			else if(pilhaDeContextos.size() > 1){
+				
+				bool achou = verificaNosContextosAnteriores(nomeVariavel, opcao);
+				if(achou){
+					return true;
+				}
+				else{
+
+					indicaErro(MSG_ERRO_NDECLARADA);
+					exit(1);
+				}
+				
+			}
+			else{
+				indicaErro(MSG_ERRO_NDECLARADA);
+				exit(1);	
+			}
+		}else if(opcao == 'd'){
+			if(variavel == ""){
+				return true;
+			}
+			else if(pilhaDeContextos.size() > 1){
+				bool podeDeclarar = verificaNosContextosAnteriores(nomeVariavel, opcao);
+				if(podeDeclarar){
+					return true;
+				}
+				else{
+					indicaErro(MSG_ERRO_NDECLARADA);
+					exit(1);
+				}
+				
+			}
+			else{
+				indicaErro(MSG_ERRO_NDECLARADA);
+				exit(1);	
+			}
+		}			
+				
+}
+
+
+string verificaErros(Atributos $1, Atributos $3, int opcao){
 	if(opcao == 1){
-		if(variavelExistente(mapaDeVariaveis[$1.label].label,'e')){
-			if(mapaDeVariaveis[$1.label].tipo == "int" || mapaDeVariaveis[$1.label].tipo == "float"){
-				if(mapaDeVariaveis[$1.label].tipo != $3.tipo){											
-					std::cout <<MSG_ERRO_TIPO<< std::endl;
+		if(variavelExistente($1.nomeVariavel,'e')){
+			Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+			if(c.mapa[$1.nomeVariavel].tipo == "int" || c.mapa[$1.labelTemp].tipo == "float"){
+				
+				if(c.mapa[$1.nomeVariavel].tipo != $3.tipo){											
+					indicaErro(MSG_ERRO_TIPO);
 					exit(1);		
-				}				
-				mapaDeVariaveis[$1.label].valor = $3.traducao;
-				string retorno = $3.traducao + "\t" + mapaDeVariaveis[$1.label].label + " = " + $3.label +";\n";
+				}
+				c.mapa[$1.nomeVariavel].valor = $3.traducao;
+				atualizarPilhaContextos(c.mapa[$1.nomeVariavel]);
+				
+				string retorno = $3.traducao + "\t" + c.mapa[$1.nomeVariavel].labelTemp + " = " + $3.labelTemp +";\n";
+				
 				return retorno;
 			}else{
-				std::cout <<MSG_ERRO_TIPO<< std::endl;
+				indicaErro(MSG_ERRO_TIPO);
 				exit(1);									
 			}					
 		}
 	}else if(opcao == 2){
-		if(variavelExistente(mapaDeVariaveis[$1.label].label, 'e')){
-			if(mapaDeVariaveis[$1.label].tipo == "bool"){
-				mapaDeVariaveis[$1.label].valor = $3.traducao;
-				string retorno = $3.traducao + "\t" + mapaDeVariaveis[$1.label].label + " = " + $3.label +";\n";
+		if(variavelExistente($1.nomeVariavel, 'e')){
+			Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+			if(c.mapa[$1.nomeVariavel].tipo == "int"){
+				c.mapa[$1.nomeVariavel].valor = $3.traducao;
+				
+				atualizarPilhaContextos(c.mapa[$1.nomeVariavel]);
+				
+				string retorno = $3.traducao + "\t" + c.mapa[$1.nomeVariavel].labelTemp + " = " + $3.labelTemp +";\n";
+				
 				return retorno;
 			}else{
-				std::cout <<MSG_ERRO_TIPO<< std::endl;
+				indicaErro(MSG_ERRO_TIPO);
 				exit(1);									
 			}
 		}
-	}	
+	}
+
 }
 
 %}
@@ -232,27 +454,18 @@ string verificaErros(atributos $1, atributos $3, int opcao){
 
 S		    : TOKEN_BEGIN TOKEN_MAIN '(' ')' BLOCO 
             {
+            	$$.labelTemp = geraLabelFinal();
 				cout << "/*Compilador ITL*/\n" << "#include <iostream>\n#include<string.h>\n#include<stdio.h>\nint main(void){\n" <<
-				$5.traducao << "\treturn 0;\n}" << endl; 							
+				$$.labelTemp << $5.traducao << "\treturn 0;\n}" << endl; 							
 			}
 			;
 
 BLOCO		: '{' COMANDOS '}'
 			{
-				$$.label = geraLabelFinal();
-				$$.traducao = $$.label + $2.traducao;
-			}
-			;
-BLOCO_WHILE	: '{' COMANDOS '}'
-			{
 				$$.traducao = $2.traducao;
 			}
 			;
-BLOCO_IF	: '{' COMANDOS '}'
-			{
-				$$.traducao = $2.traducao;
-			}
-			;										
+								
 
 COMANDOS	: COMANDO COMANDOS
 			{
@@ -266,11 +479,17 @@ COMANDOS	: COMANDO COMANDOS
 
 COMANDO 	: TOKEN_NOMEVAR TOKEN_ATR E ';' 
 			{
+
 				$$.traducao = verificaErros($1, $3, 1);
+
+
 			}
 			| TOKEN_NOMEVAR TOKEN_ATR ERL ';' 
 			{
+
 				$$.traducao = verificaErros($1, $3, 2);
+		
+			
 			}
 			| DCL ';'
 			| IF
@@ -279,101 +498,102 @@ COMANDO 	: TOKEN_NOMEVAR TOKEN_ATR E ';'
 
 DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 			{	
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					$$.tipo = "int";
 					$$.valor = "null";
-
-					$$.label = geraVarTemp($$.tipo);
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $3.traducao;
-
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
+					std::cout <<"label de a: "<<pilhaDeContextos.top().mapa["a"].labelTemp<< std::endl;
+					
 				}
 			}
 			| TOKEN_INT TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_INT
 			{
 				
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					$$.tipo = "int";
 					$$.valor = $4.valor;			
 
 					if($4.tipo != $$.tipo ){																
-						std::cout <<MSG_ERRO_TIPO<< std::endl;
+						indicaErro(MSG_ERRO_TIPO);
 						exit(1);		
 					}				
-
-					$$.label = geraVarTemp($$.tipo);
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.valor = $4.traducao;
-					$$.traducao = $4.traducao +  "\t" + $$.label + " = " + $4.label + ";\n" + $5.traducao; 
+					$$.traducao = $4.traducao + "\t" + $$.labelTemp + " = " + $4.labelTemp + ";\n" + $5.traducao; 
 
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
 				}
 
 			}
 			| TOKEN_FLOAT TOKEN_NOMEVAR MLTVAR_FLOAT
 			{
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					
 					$$.tipo = "float";
 					$$.valor = "null";		
-
-					$$.label = geraVarTemp($$.tipo);
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $3.traducao;
 
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
 				}	
 			}
 			| TOKEN_FLOAT TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_FLOAT
 			{
 
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 
 					$$.tipo = "float";
 					$$.valor = $4.valor;
 
 					if($4.tipo != $$.tipo ){																
-						std::cout <<MSG_ERRO_TIPO<< std::endl;
+						indicaErro(MSG_ERRO_TIPO);
 						exit(1);		
 					}
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
+					$$.traducao = $4.traducao +  "\t" + $$.labelTemp + " = " + $4.labelTemp + ";\n" + $5.traducao; 
 
-					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $4.traducao +  "\t" + $$.label + " = " + $4.label + ";\n" + $5.traducao; 
-
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
 				}
 
 			}
 			| TOKEN_CHAR TOKEN_NOMEVAR MLTVAR_CHAR
 			{	
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					$$.tipo = "char";
 					$$.valor = "null";
-
-					$$.label = geraVarTemp($$.tipo);
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $3.traducao;
 
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
 				}
 
 			}
 			| TOKEN_CHAR TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_CHAR
 			{
 
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					if(tipoGeral == 2){
 						$$.tipo = "char";
 						$$.valor = $4.valor;
 
 						if($4.tipo != $$.tipo ){																
-							std::cout <<MSG_ERRO_TIPO<< std::endl;
+							indicaErro(MSG_ERRO_TIPO);
 							exit(1);		
 						}
-						
-						$$.label = geraVarTemp($$.tipo);
-						$$.traducao = $4.traducao +  "\t" + $$.label + " = " + $4.label + ";\n" + $5.traducao; 
+						$$.nomeVariavel = $2.nomeVariavel;
+						$$.labelTemp = geraLabelTemp($$.tipo);
+						$$.traducao = $4.traducao +  "\t" + $$.labelTemp + " = " + $4.labelTemp + ";\n" + $5.traducao; 
 
-						mapaDeVariaveis[$2.label] = $$;
+						adicionaVariavelContexto($$);
 					}else{
-						std::cout <<MSG_ERRO_TIPO<< std::endl;
+						indicaErro(MSG_ERRO_TIPO);
 						exit(1);
 					}
 
@@ -382,37 +602,37 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 			}
 			| TOKEN_BOOL TOKEN_NOMEVAR MLTVAR_BOOL
 			{	
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					$$.tipo = "bool";
 					$$.valor = "null";
-
-					$$.label = geraVarTemp($$.tipo);
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $3.traducao;
 
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
 				}
 			}
 			| TOKEN_BOOL TOKEN_NOMEVAR TOKEN_ATR ERL MLTVAR_BOOL
 			{
 
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					if ($4.valor == "0" || $4.valor == "1"){
 						$$.tipo = "bool";
 						$$.valor = $4.valor;				
 
 						
 						if($4.tipo != $$.tipo ){																
-							std::cout <<MSG_ERRO_TIPO<< std::endl;
+							indicaErro(MSG_ERRO_TIPO);
 							exit(1);		
 						}
+						$$.nomeVariavel = $2.nomeVariavel;
+						$$.labelTemp = geraLabelTemp($$.tipo);
+						$$.traducao = $4.traducao +  "\t" + $$.labelTemp + " = " + $4.labelTemp + ";\n" + $5.traducao; 
 
-						$$.label = geraVarTemp($$.tipo);
-						$$.traducao = $4.traducao +  "\t" + $$.label + " = " + $4.label + ";\n" + $5.traducao; 
-
-						mapaDeVariaveis[$2.label] = $$;	
+						adicionaVariavelContexto($$);	
 					}
 					else {
-						std::cout << MSG_ERRO_TIPO<< std::endl;
+						indicaErro(MSG_ERRO_TIPO);
 						std::cout <<$4.valor<< std::endl;			
 						exit(1);
 					}
@@ -424,32 +644,32 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 
 MLTVAR_INT	: ',' TOKEN_NOMEVAR MLTVAR_INT
 			{
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					$$.tipo = "int";
 					$$.valor = "null";
-
-					$$.label = geraVarTemp($$.tipo);
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = "";
 					
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
 				}
 			}
 			| ',' TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_INT
 			{
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					$$.tipo = "int";
 					$$.valor = $4.valor;
 
 					if($4.tipo != $$.tipo ){																
-						std::cout << MSG_ERRO_TIPO<< std::endl;
+						indicaErro(MSG_ERRO_TIPO);
 						exit(1);		
 					}				
 								
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
+					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.labelTemp + " = " + $4.labelTemp + ";\n" ;
 
-					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n" ;
-
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
 				}
 			}
 			|
@@ -460,26 +680,26 @@ MLTVAR_INT	: ',' TOKEN_NOMEVAR MLTVAR_INT
 
 MLTVAR_FLOAT: ',' TOKEN_NOMEVAR MLTVAR_FLOAT
 			{
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					$$.tipo = "float";
 					$$.valor = "null";
-
-					$$.label = geraVarTemp($$.tipo);
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = "";
 
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
 				}
 			}
 			| ',' TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_FLOAT
 			{
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					$$.tipo = "float";
 					$$.valor = $4.valor;
-
-					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n" ;
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
+					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.labelTemp + " = " + $4.labelTemp + ";\n" ;
 					
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
 				}
 			}
 			|
@@ -490,26 +710,26 @@ MLTVAR_FLOAT: ',' TOKEN_NOMEVAR MLTVAR_FLOAT
 
 MLTVAR_CHAR	: ',' TOKEN_NOMEVAR MLTVAR_CHAR
 			{
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					$$.tipo = "char";
 					$$.valor = "null";
-					
-					$$.label = geraVarTemp($$.tipo);
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = "";
 
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
 				}
 			}
 			| ',' TOKEN_NOMEVAR TOKEN_ATR E MLTVAR_CHAR
 			{
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					$$.tipo = "char";
 					$$.valor = $4.valor;
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
+					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.labelTemp + " = " + $4.labelTemp + ";\n" ;
 					
-					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n" ;
-					
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
 				}
 			}
 			|
@@ -520,26 +740,26 @@ MLTVAR_CHAR	: ',' TOKEN_NOMEVAR MLTVAR_CHAR
 
 MLTVAR_BOOL : ',' TOKEN_NOMEVAR MLTVAR_BOOL
 			{
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					$$.tipo = "bool";
 					$$.valor = "null";
-					
-					$$.label = geraVarTemp($$.tipo);
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = "";
 
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
 				}
 			}
 			| ',' TOKEN_NOMEVAR TOKEN_ATR ERL MLTVAR_BOOL
 			{
-				if(variavelExistente(mapaDeVariaveis[$2.label].label, 'd')){
+				if(variavelExistente($2.nomeVariavel, 'd')){
 					$$.tipo = "bool";
 					$$.valor = $4.valor;
-
-					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.label + " = " + $4.label + ";\n" ;
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
+					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.labelTemp + " = " + $4.labelTemp + ";\n" ;
 					
-					mapaDeVariaveis[$2.label] = $$;
+					adicionaVariavelContexto($$);
 				}
 			}
 			|
@@ -547,76 +767,82 @@ MLTVAR_BOOL : ',' TOKEN_NOMEVAR MLTVAR_BOOL
 				$$.traducao = "";
 			}
 			;			
-IF 			: TOKEN_IF '(' ERL ')' BLOCO_IF
+IF 			: TOKEN_IF '(' ERL ')' BLOCO
 			{		
+					//criarContexto(0, "", "FIM_IF"); O ERRO ESTAVA AQUI!
 					$$.tipo = "bool";
-					$$.label = geraVarTemp($$.tipo);
-					$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
-					"\t" + $$.label + " = " + $3.label + ";\n" +
-					"\tif(!" + $$.label + ") goto FIM_IF;\n" +
-					$5.traducao +
+					$$.labelTemp = geraLabelTemp($$.tipo);
+					$$.traducao = "\n\t//IF COMEÇA\n" + $3.traducao +
+					"\t" + $$.labelTemp + " = " + $3.labelTemp + ";\n" +
+					"\tif(!" + $$.labelTemp + ") goto FIM_IF;\n" + $5.traducao +
 					"\n\tFIM_IF:\n\t//IF TERMINA\n\n";
+					
 			}
-			| TOKEN_IF '(' ERL ')' BLOCO_IF ELSEIF
+			| TOKEN_IF '(' ERL ')' BLOCO ELSEIF
 			{
+					//criarContexto(0, "ELSEIF", "");
 					$$.tipo = "bool";
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
-					"\t" + $$.label + " = " + $3.label + ";\n" +
-					"\tif(!" + $$.label + ") goto ELSEIF:;\n" +
+					"\t" + $$.labelTemp + " = " + $3.labelTemp + ";\n" +
+					"\tif(!" + $$.labelTemp + ") goto ELSEIF:;\n" +
 					$5.traducao + $6.traducao;
 			}
-			| TOKEN_IF '(' ERL ')' BLOCO_IF TOKEN_ELSE BLOCO_IF
+			| TOKEN_IF '(' ERL ')' BLOCO TOKEN_ELSE BLOCO
 			{
+					//criarContexto(0, "ELSE", "FIM_ELSE");
 					$$.tipo = "bool";
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
-					"\t" + $$.label + " = " + $3.label + ";\n" +
-					"\tif(!" + $$.label + ") goto ELSE;\n" +
+					"\t" + $$.labelTemp + " = " + $3.labelTemp + ";\n" +
+					"\tif(!" + $$.labelTemp + ") goto ELSE;\n" +
 					$5.traducao +"\tgoto FIM_ELSE;\n"+
 					"\n\t//ELSE COMEÇA\n\tELSE:\n" + $7.traducao+"\tFIM_ELSE:\n\t//ELSE TERMINA\n\t"+
 					"//IF TERMINA\n\n";
 			}
 			;
 
-ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO_IF
+ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO
 			{		
+					//criarContexto(0, "ELSEIF", "FIM_ELSEIF");
 					$$.tipo = "bool";
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = "\n\t//ELSEIF COMEÇA\n\tELSEIF:\n"+$3.traducao +
-					"\t" + $$.label + " = " + $3.label + ";\n" +
-					"\tif(!" + $$.label + ") goto FIM_ELSEIF;\n" +
+					"\t" + $$.labelTemp + " = " + $3.labelTemp + ";\n" +
+					"\tif(!" + $$.labelTemp + ") goto FIM_ELSEIF;\n" +
 					$5.traducao + 
 					"\n\tFIM_ELSEIF:\n\t//ELSEIF TERMINA\n\t//IF TERMINA\n\n";
 
 			}
-			| TOKEN_ELSEIF '(' ERL ')' BLOCO_IF TOKEN_ELSE BLOCO_IF
+			| TOKEN_ELSEIF '(' ERL ')' BLOCO TOKEN_ELSE BLOCO
 			{
+					//criarContexto(0, "ELSEIF", "FIM_ELSE");
 					$$.tipo = "bool";
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = "\n\t//ELSEIF COMEÇA\n\tELSEIF:\n"+$3.traducao +
-					"\t" + $$.label + " = " + $3.label + ";\n" +
-					"\tif(!" + $$.label + ") goto ELSE;\n" +
+					"\t" + $$.labelTemp + " = " + $3.labelTemp + ";\n" +
+					"\tif(!" + $$.labelTemp + ") goto ELSE;\n" +
 					$5.traducao + "\tgoto FIM_ELSE;\n"+
 					"\n\t//ELSE COMEÇA\n\tELSE:\n" + $7.traducao+"\tFIM_ELSE:\n\t//ELSE TERMINA\n\t"+
 					"//ELSEIF TERMINA\n\t//IF TERMINA\n\n";
 			}
 			;
 
-WHILE 		: TOKEN_WHILE '(' ERL ')' BLOCO_WHILE
+WHILE 		: TOKEN_WHILE '(' ERL ')' BLOCO
 			{	
+				//criarContexto(1, "WHILE", "");
 				$$.tipo = "bool";
-				$$.label = geraVarTemp($$.tipo);
+				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//WHILE COMEÇA\n"+ $3.traducao +
-					"\t" + $$.label + " = " + $3.label + ";\n" +
-					"\t" + "if("+$3.label+"){\n\tWHILE:\n"+$5.traducao+"\t}if("+$3.label+") goto WHILE;\n\t//WHILE TERMINA\n";
+					"\t" + $$.labelTemp + " = " + $3.labelTemp + ";\n" +
+					"\t" + "if("+$3.labelTemp+"){\n\tWHILE:\n"+$5.traducao+"\t}if("+$3.labelTemp+") goto WHILE;\n\t//WHILE TERMINA\n";
 			}
 			;
 
 ERL         : '(' ERL ')'
 			{
 				$$.tipo = $2.tipo;
-				$$.label = $2.label;
+				$$.labelTemp = $2.labelTemp;
 				$$.traducao = $2.traducao;
 			}
  			| ERL TOKEN_MAIOR ERL
@@ -626,29 +852,29 @@ ERL         : '(' ERL ')'
 				string theCasting = ""; 
 
 				if(fazCasting == 1){					
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.labelTemp + ";\n";
 
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + labelCasting + " > " + $3.label +
+					$$.labelTemp + " = " + labelCasting + " > " + $3.labelTemp +
 					";\n";
 
 				}
 				else if(fazCasting == 2){
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.labelTemp + ";\n";
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + $1.label + " > " + labelCasting +
+					$$.labelTemp + " = " + $1.labelTemp + " > " + labelCasting +
 					";\n";
 				}
 				else{		
-					
-					$$.label = geraVarTemp($$.tipo);
+
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " > " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " > " + $3.labelTemp +
 					";\n";
 				}
 
@@ -660,29 +886,29 @@ ERL         : '(' ERL ')'
 				string theCasting = ""; 
 
 				if(fazCasting == 1){					
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.labelTemp + ";\n";
 
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + labelCasting + " < " + $3.label +
+					$$.labelTemp + " = " + labelCasting + " < " + $3.labelTemp +
 					";\n";
 
 				}
 				else if(fazCasting == 2){
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.labelTemp + ";\n";
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + $1.label + " < " + labelCasting +
+					$$.labelTemp + " = " + $1.labelTemp + " < " + labelCasting +
 					";\n";
 				}
 				else{		
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " < " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " < " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -693,29 +919,29 @@ ERL         : '(' ERL ')'
 				string theCasting = ""; 
 
 				if(fazCasting == 1){					
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.labelTemp + ";\n";
 
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + labelCasting + " >= " + $3.label +
+					$$.labelTemp + " = " + labelCasting + " >= " + $3.labelTemp +
 					";\n";
 
 				}
 				else if(fazCasting == 2){
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.labelTemp + ";\n";
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + $1.label + " >= " + labelCasting +
+					$$.labelTemp + " = " + $1.labelTemp + " >= " + labelCasting +
 					";\n";
 				}
 				else{		
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " >= " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " >= " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -726,29 +952,29 @@ ERL         : '(' ERL ')'
 				string theCasting = ""; 
 
 				if(fazCasting == 1){					
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.labelTemp + ";\n";
 
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + labelCasting + " <= " + $3.label +
+					$$.labelTemp + " = " + labelCasting + " <= " + $3.labelTemp +
 					";\n";
 
 				}
 				else if(fazCasting == 2){
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.labelTemp + ";\n";
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + $1.label + " <= " + labelCasting +
+					$$.labelTemp + " = " + $1.labelTemp + " <= " + labelCasting +
 					";\n";
 				}
 				else{		
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " <= " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " <= " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -759,29 +985,29 @@ ERL         : '(' ERL ')'
 				string theCasting = ""; 
 
 				if(fazCasting == 1){					
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.labelTemp + ";\n";
 
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + labelCasting + " != " + $3.label +
+					$$.labelTemp + " = " + labelCasting + " != " + $3.labelTemp +
 					";\n";
 
 				}
 				else if(fazCasting == 2){
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.labelTemp + ";\n";
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + $1.label + " != " + labelCasting +
+					$$.labelTemp + " = " + $1.labelTemp + " != " + labelCasting +
 					";\n";
 				}
 				else{		
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " != " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " != " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -792,29 +1018,29 @@ ERL         : '(' ERL ')'
 				string theCasting = ""; 
 
 				if(fazCasting == 1){					
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.labelTemp + ";\n";
 
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + labelCasting + " == " + $3.label +
+					$$.labelTemp + " = " + labelCasting + " == " + $3.labelTemp +
 					";\n";
 
 				}
 				else if(fazCasting == 2){
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.labelTemp + ";\n";
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + $1.label + " == " + labelCasting +
+					$$.labelTemp + " = " + $1.labelTemp + " == " + labelCasting +
 					";\n";
 				}
 				else{		
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " == " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " == " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -825,29 +1051,29 @@ ERL         : '(' ERL ')'
 				string theCasting = ""; 
 
 				if(fazCasting == 1){					
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.labelTemp + ";\n";
 
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + labelCasting + " && " + $3.label +
+					$$.labelTemp + " = " + labelCasting + " && " + $3.labelTemp +
 					";\n";
 
 				}
 				else if(fazCasting == 2){
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.labelTemp + ";\n";
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + $1.label + " && " + labelCasting +
+					$$.labelTemp + " = " + $1.labelTemp + " && " + labelCasting +
 					";\n";
 				}
 				else{		
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " && " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " && " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -858,29 +1084,29 @@ ERL         : '(' ERL ')'
 				string theCasting = ""; 
 
 				if(fazCasting == 1){					
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $1.labelTemp + ";\n";
 
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + labelCasting + " || " + $3.label +
+					$$.labelTemp + " = " + labelCasting + " || " + $3.labelTemp +
 					";\n";
 
 				}
 				else if(fazCasting == 2){
-					string labelCasting = geraVarTemp("float");
-					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					string labelCasting = geraLabelTemp("float");
+					theCasting = "\t" + labelCasting + " = (float) " + $3.labelTemp + ";\n";
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + $1.label + " || " + labelCasting +
+					$$.labelTemp + " = " + $1.labelTemp + " || " + labelCasting +
 					";\n";
 				}
 				else{		
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " || " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " || " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -893,7 +1119,7 @@ ERL         : '(' ERL ')'
 E 			: '(' E ')'
 			{
 				$$.tipo = $2.tipo;
-				$$.label = $2.label;
+				$$.labelTemp = $2.labelTemp;
 				$$.traducao = $2.traducao;
 			}
 			| E '+' E
@@ -903,37 +1129,37 @@ E 			: '(' E ')'
 
 				if(fazCasting == 1){
 					$$.tipo = "float";
-					string labelCasting = geraVarTemp($$.tipo);
-					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+					string labelCasting = geraLabelTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $1.labelTemp + ";\n";
 
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + labelCasting + " + " + $3.label +
+					$$.labelTemp + " = " + labelCasting + " + " + $3.labelTemp +
 					";\n";
 
 				}
 				else if(fazCasting == 2){
 					$$.tipo = "float";
-					string labelCasting = geraVarTemp($$.tipo);
-					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					string labelCasting = geraLabelTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $3.labelTemp + ";\n";
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + $1.label + " + " + labelCasting +
+					$$.labelTemp + " = " + $1.labelTemp + " + " + labelCasting +
 					";\n";
 				}
 				else if(fazCasting == 0){
 					$$.tipo = "int";
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " + " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " + " + $3.labelTemp +
 					";\n";
 				}
 				else{		
 					$$.tipo = "float";
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " + " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " + " + $3.labelTemp +
 					";\n";
 				}
 
@@ -946,37 +1172,37 @@ E 			: '(' E ')'
 
 				if(fazCasting == 1){
 					$$.tipo = "float";
-					string labelCasting = geraVarTemp($$.tipo);
-					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+					string labelCasting = geraLabelTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $1.labelTemp + ";\n";
 
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + labelCasting + " - " + $3.label +
+					$$.labelTemp + " = " + labelCasting + " - " + $3.labelTemp +
 					";\n";
 
 				}
 				else if(fazCasting == 2){
 					$$.tipo = "float";
-					string labelCasting = geraVarTemp($$.tipo);
-					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					string labelCasting = geraLabelTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $3.labelTemp + ";\n";
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + $1.label + " - " + labelCasting +
+					$$.labelTemp + " = " + $1.labelTemp + " - " + labelCasting +
 					";\n";
 				}
 				else if(fazCasting == 0){
 					$$.tipo = "int";
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " - " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " - " + $3.labelTemp +
 					";\n";
 				}
 				else{		
 					$$.tipo = "float";
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " - " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " - " + $3.labelTemp +
 					";\n";
 				}
 				
@@ -988,37 +1214,37 @@ E 			: '(' E ')'
 
 				if(fazCasting == 1){
 					$$.tipo = "float";
-					string labelCasting = geraVarTemp($$.tipo);
-					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+					string labelCasting = geraLabelTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $1.labelTemp + ";\n";
 
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + labelCasting + " * " + $3.label +
+					$$.labelTemp + " = " + labelCasting + " * " + $3.labelTemp +
 					";\n";
 
 				}
 				else if(fazCasting == 2){
 					$$.tipo = "float";
-					string labelCasting = geraVarTemp($$.tipo);
-					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					string labelCasting = geraLabelTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $3.labelTemp + ";\n";
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + $1.label + " * " + labelCasting +
+					$$.labelTemp + " = " + $1.labelTemp + " * " + labelCasting +
 					";\n";
 				}
 				else if(fazCasting == 0){
 					$$.tipo = "int";
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " * " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " * " + $3.labelTemp +
 					";\n";
 				}
 				else{		
 					$$.tipo = "float";
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " * " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " * " + $3.labelTemp +
 					";\n";
 				}
 				
@@ -1030,37 +1256,37 @@ E 			: '(' E ')'
 
 				if(fazCasting == 1){
 					$$.tipo = "float";
-					string labelCasting = geraVarTemp($$.tipo);
-					theCasting = "\t" + labelCasting + " = (float) " + $1.label + ";\n";
+					string labelCasting = geraLabelTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $1.labelTemp + ";\n";
 
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + labelCasting + " / " + $3.label +
+					$$.labelTemp + " = " + labelCasting + " / " + $3.labelTemp +
 					";\n";
 
 				}
 				else if(fazCasting == 2){
 					$$.tipo = "float";
-					string labelCasting = geraVarTemp($$.tipo);
-					theCasting = "\t" + labelCasting + " = (float) " + $3.label + ";\n";
+					string labelCasting = geraLabelTemp($$.tipo);
+					theCasting = "\t" + labelCasting + " = (float) " + $3.labelTemp + ";\n";
 					
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.label + " = " + $1.label + " / " + labelCasting +
+					$$.labelTemp + " = " + $1.labelTemp + " / " + labelCasting +
 					";\n";
 				}
 				else if(fazCasting == 0){
 					$$.tipo = "int";
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " / " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " / " + $3.labelTemp +
 					";\n";
 				}
 				else{		
 					$$.tipo = "float";
-					$$.label = geraVarTemp($$.tipo);
+					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.label + " = " + $1.label + " / " + $3.label +
+					$$.labelTemp + " = " + $1.labelTemp + " / " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -1068,24 +1294,24 @@ E 			: '(' E ')'
 			{
 				$$.tipo = "float";
 				
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $2.traducao + "\t" + $$.label + " = (float) " + $2.label +
+				$$.labelTemp = geraLabelTemp($$.tipo);
+				$$.traducao = $2.traducao + "\t" + $$.nomeVariavel + " = (float) " + $2.nomeVariavel +
 				";\n";
 			}
 			| TOKEN_CONV_INT E
 			{
 				$$.tipo = "int";
 				
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $2.traducao + "\t" + $$.label + " = (int) " + $2.label +
+				$$.labelTemp = geraLabelTemp($$.tipo);
+				$$.traducao = $2.traducao + "\t" + $$.nomeVariavel + " = (int) " + $2.nomeVariavel +
 				";\n";
 			}
 			| '-' E
 			{
 				$$.tipo = $2.tipo;
 
-				$$.label = geraVarTemp($$.tipo);
-				$$.traducao = $2.traducao + "\t" + $$.label + " = -" + $2.label +
+				$$.labelTemp = geraLabelTemp($$.tipo);
+				$$.traducao = $2.traducao + "\t" + $$.nomeVariavel + " = -" + $2.nomeVariavel +
 				";\n";			
 			}
 			| E_BASICA
@@ -1098,46 +1324,49 @@ E_BASICA	: TOKEN_NUM_INT
 			{
 				tipoGeral = 1;
 				$$.tipo = "int";
-				$$.label = geraVarTemp($$.tipo);
+				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.valor = $1.traducao;
-				$$.traducao = "\t" + $$.label + " = " + $1.traducao +
+				$$.traducao = "\t" + $$.labelTemp + " = " + $1.traducao +
 				";\n";
 			}
 			| TOKEN_NUM_FLOAT
 			{
 				tipoGeral = 1;
 				$$.tipo = "float";
-				$$.label = geraVarTemp($$.tipo);
+				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.valor = $1.traducao;
-				$$.traducao = "\t" + $$.label + " = " + $1.traducao +
+				$$.traducao = "\t" + $$.labelTemp + " = " + $1.traducao +
 				";\n";
 			}
 			| TOKEN_NOMEVAR
 			{
+				
+                if(variavelExistente($1.nomeVariavel, 'e')){ //Se a variável existir...
+                	Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+					if(c.mapa[$1.nomeVariavel].tipo == "float" || c.mapa[$1.nomeVariavel].tipo == "int"){
 
-                if(mapaDeVariaveis.find($1.label) != mapaDeVariaveis.end()){
-					if(mapaDeVariaveis[$1.label].tipo == "float" || mapaDeVariaveis[$1.label].tipo == "int"){
+						if(c.mapa[$1.nomeVariavel].valor != "null"){						
 
-						if(mapaDeVariaveis[$1.label].valor != "null"){						
-
-							$$.label = mapaDeVariaveis[$1.label].label;
-							$$.valor = mapaDeVariaveis[$1.label].valor;
-							$$.tipo = mapaDeVariaveis[$1.label].tipo;
+							$$.nomeVariavel = $1.nomeVariavel;
+							$$.labelTemp = pilhaDeContextos.top().mapa[$$.nomeVariavel].labelTemp;							
+							$$.valor = pilhaDeContextos.top().mapa[$$.nomeVariavel].valor;
+							$$.tipo = pilhaDeContextos.top().mapa[$$.nomeVariavel].tipo;
 							$$.traducao = ""; 
 
 						}
 						else{
-							std::cout <<mapaDeVariaveis[$1.label].label<<MSG_ERRO_INICIALIZADA << std::endl;
+							std::cout <<c.mapa[$1.nomeVariavel].nomeVariavel<<MSG_ERRO_INICIALIZADA <<std::endl<<"Linea "<<ctdLinhas<< std::endl;
 							exit(1);															
 						}
 					}
 					else{
-						std::cout <<MSG_ERRO_TIPO<< std::endl;
+						indicaErro(MSG_ERRO_TIPO);
 						exit(1);									
 					}
 				}
 				else{
-					std::cout <<MSG_ERRO_NDECLARADA<< std::endl;
+
+					indicaErro(MSG_ERRO_NDECLARADA);
 					exit(1);									
 				}
 
@@ -1147,26 +1376,26 @@ E_BASICA	: TOKEN_NUM_INT
 			| TOKEN_BOOLEAN_FALSE
 			{
 				$$.tipo = "bool";
-				$$.label = geraVarTemp($$.tipo);
+				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.valor = "0";
-				$$.traducao = "\t" + $$.label + " = " + $$.valor +
+				$$.traducao = "\t" + $$.labelTemp + " = " + $$.valor +
 				";\n";
 			}
 			| TOKEN_BOOLEAN_TRUE
 			{
 				$$.tipo = "bool";
-				$$.label = geraVarTemp($$.tipo);
+				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.valor = "1";
-				$$.traducao = "\t" + $$.label + " = " + $$.valor +
+				$$.traducao = "\t" + $$.labelTemp + " = " + $$.valor +
 				";\n";
 			}
 			| TOKEN_CARACTERE
 			{
 				tipoGeral = 2;
 				$$.tipo = "char";
-				$$.label = geraVarTemp($$.tipo);
+				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.valor = $1.traducao;
-				$$.traducao = "\t" + $$.label + " = " + $1.traducao +
+				$$.traducao = "\t" + $$.labelTemp + " = " + $1.traducao +
 				";\n";
 			}					
             ;
