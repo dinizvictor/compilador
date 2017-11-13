@@ -37,8 +37,11 @@ BOOL [true]|[false]
 "altrise"			{return TOKEN_ELSEIF;}
 "scelta"			{return TOKEN_SWITCH;}
 "caso"				{return TOKEN_CASE;}
+"predefinito"		{return TOKEN_DEFAULT;}
 
 "rompere" 			{return TOKEN_BREAK;}
+"continuare"		{return TOKEN_CONTINUE;}
+
 "fare" 				{return TOKEN_DO;}
 "per" 				{return TOKEN_FOR;}
 "mentre"			{return TOKEN_WHILE;}

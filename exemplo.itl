@@ -2,11 +2,19 @@ iniziare principale(){
 	
 	tutto a, b;
 	a = 2;
-	se(1 > 2){
-		a = 3;
-		
+	b = 3;
+	se (a > b){
+		a = 2;
+		continuare;
 	}
-	se(1 > 2){
-		a = 3;
+
+	fare{
+		a = 9;
+	}mentre(a>b);
+
+	per( a = 0; a > b; a++){
+		tutto j = 0;
 	}
+
+	
 }
