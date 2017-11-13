@@ -71,7 +71,7 @@ BOOL [true]|[false]
 "true"				{yylval.traducao = yytext; return TOKEN_BOOLEAN_TRUE; }
 
 [{]					{ empilhaMapa(); return *yytext; }
-[}]					{ desempilhaMapa(); return *yytext; }
+[}]					{ return *yytext; }
 [()[\];,]			{ return *yytext; }	
 [+\-*/]				{ return *yytext; }
 {NUM}			    { yylval.traducao = yytext; return TOKEN_NUM_INT; }

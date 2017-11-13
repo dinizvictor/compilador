@@ -3,18 +3,9 @@ iniziare principale(){
 	tutto a, b;
 	a = 2;
 	b = 3;
-	se (a > b){
+
+	mentre(a > b){
 		a = 2;
-		continuare;
+		rompere;	
 	}
-
-	fare{
-		a = 9;
-	}mentre(a>b);
-
-	per( a = 0; a > b; a++){
-		tutto j = 0;
-	}
-
-	
 }
