@@ -1,11 +1,46 @@
-iniziare principale(){
+iniziare principale(){	
 	
-	tutto a, b;
-	a = 2;
-	b = 3;
+	corda a = 'bc';
+	
 
-	mentre(a > b){
-		a = 2;
-		rompere;	
+	tutto b = 1;
+
+	>//
+		tutto a = 2;
+	|\<
+
+	fare{
+		tutto b = 0;
+	}(b > 0);
+
+	per(b = 0; b <= 10; b++){
+		stampare(b);
 	}
+
+	a = 'oi' . 'au';
+
+	<// leggere(b);
+	
+	mentre(true){
+		se(b == 0){
+			rompere;
+		}altrise(b > 0){
+			continuare;
+		}
+	}
+	
+	se(b == 0){
+		tutto c = 0;
+	}altrise(b <= 10){
+		tutto c = 5;
+	}altri{
+		tutto c = 20;
+	}
+
+	scelta (b, (
+		caso 9 -> b = 0; rompere; 
+		caso 10 -> b = 1; rompere;
+		caso 11 -> b = 5; rompere;
+		predefinito -> b = 2; rompere;
+	));
 }

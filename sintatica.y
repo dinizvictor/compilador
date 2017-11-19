@@ -15,6 +15,8 @@ struct Atributos{
 	string traducao;
 	string tipo;
 	string valor;
+	string varTamString;
+	int tamanho;	
 };
 
 typedef	std::map<string,Atributos> MapaDeVariaveis;
@@ -22,8 +24,8 @@ typedef	std::map<string,Atributos> MapaDeVariaveis;
 struct Contexto{
 	MapaDeVariaveis mapa;
 	bool interrompivel;
-	string labelInicio;
-	string labelFim;
+	string rotuloInicio;
+	string rotuloFim;
 };
 
 
@@ -32,9 +34,12 @@ typedef std::stack<Contexto> PilhaContexto;
 
 static PilhaContexto pilhaDeContextos;
 
-void empilhaMapa(){
+void empilhaMapa(bool interrompivel, string rotuloInicio, string rotuloFim){
 
 	Contexto c;
+	c.interrompivel = interrompivel;
+	c.rotuloInicio = rotuloInicio;
+	c.rotuloFim = rotuloFim;
 	pilhaDeContextos.push(c);
 
 }
@@ -48,24 +53,24 @@ void desempilhaMapa(){
 int yylex(void);
 
 string MSG_ERRO = "\nErrore:\n";
-string MSG_ERRO_TIPO = "\nErrore:\nTipo errato per variabile\n";
-string MSG_ERRO_NDECLARADA = "\nErrore:\nVariabile non dichiarata\n";
-string MSG_ERRO_DECLARADA = "\nErrore:\nVariabile già dichiarata\n";
-string MSG_ERRO_INICIALIZADA = "\nErrore:\nvariabile non inizializzata\n";
-string MSG_ERRO_CONTEXTONAOINTERROMPIVEL = "\nErrore:\nerrore de contesto\n";
+string MSG_ERRO_TIPO = "\nErrore:\nTipo errato per variabile";
+string MSG_ERRO_NDECLARADA = "\nErrore:\nVariabile non dichiarata";
+string MSG_ERRO_DECLARADA = "\nErrore:\nVariabile già dichiarata";
+string MSG_ERRO_INICIALIZADA = "\nErrore:\nvariabile non inizializzata";
+string MSG_ERRO_CONTEXTONAOINTERROMPIVEL = "\nErrore:\ncontesto non interrompibile";
 
 void yyerror(string);
 
-static int ctdDInt = 0, ctdDFloat = 0, ctdDChar = 0, ctdDBool = 0;
+static int ctdDInt = 0, ctdDFloat = 0, ctdDChar = 0, ctdDBool = 0, ctdDString = 0, ctdDStringTam = 0;
+static string switchPar, sSwitch,sFSwitch;
+static int nCL = 0;
 static int fazCasting;
 static int tipoGeral;
 static int ctdLinhas = 1;
-static string switchPar;
-static int ctdIf = 0, ctdEIf = 0, ctdIfE = 0, ctdElse = 0, ctdWhile = 0,ctdFor = 0; ; 
 
 void indicaErro(string MSG){
 
-	std::cout<<MSG<<"Linea "<<ctdLinhas<<std::endl;
+	std::cout<<MSG<<" (linea "<<ctdLinhas<<")\n"<<std::endl;
 
 }
 
@@ -95,23 +100,9 @@ void adicionaVariavelContexto(Atributos a){
 
 }
 
-void setarContexto(bool interrompivel, string labelI, string labelF){
-
-	if(!pilhaDeContextos.empty()){
-		cout<<pilhaDeContextos.size()<<endl;
-		cout<<"Inte: "<<interrompivel<<endl;
-		cout<<"labelI: "<<labelI<<endl;
-		cout<<"labelF: "<<labelF<<endl;
-		pilhaDeContextos.top().interrompivel = interrompivel;
-		pilhaDeContextos.top().labelInicio = labelI;
-		pilhaDeContextos.top().labelFim = labelF;
-	}
-
-}
-
 string geraLabelTemp(string tipo){
 
-	static int nI = 0, nF = 0, nC = 0, nB = 0;
+	static int nI = 0, nF = 0, nC = 0, nB = 0, nS = 0, nST = 0;
 	
 	if(tipo == "int"){
 		ctdDInt += 1;
@@ -127,6 +118,16 @@ string geraLabelTemp(string tipo){
 		ctdDChar += 1;
 		nC++;
 		return "TMP_CHAR_" + to_string(nC);
+	}
+	if(tipo == "string"){
+		ctdDString += 1;
+		nS++;
+		return "TMP_STRING_" + to_string(nS);
+	}
+	if(tipo == "string_tam"){
+		ctdDStringTam += 1;
+		nST++;
+		return "TMP_STRING_TAM_" + to_string(nST);
 	}
 	if(tipo == "bool"){
 		ctdDBool += 1;
@@ -146,37 +147,62 @@ string geraLabelFinal(){
 			i++;
 		}
 		declaracao = declaracao + "TMP_INT_" + to_string(i) + ";\n";
-		i = 1;
 	}
+	i = 1;
+	if(ctdDStringTam > 0){
+		declaracao = declaracao + "\tint ";
+		while(i < ctdDStringTam){
+			declaracao = declaracao + "TMP_STRING_TAM_" + to_string(i) + ", ";
+			i++;
+		}
+		declaracao = declaracao + "TMP_STRING_TAM_" + to_string(i) + ";\n";
+	}
+	i = 1;
 	if(ctdDFloat > 0){
 		declaracao = declaracao + "\tfloat ";
 		while(i < ctdDFloat){
 			declaracao = declaracao + "TMP_FLOAT_" + to_string(i) + ", ";
 			i++;
 		}
-		declaracao = declaracao + "TMP_FLOAT_" + to_string(i) + ";\n";
-		i = 1;
+		declaracao = declaracao + "TMP_FLOAT_" + to_string(i) + ";\n";		
 	}
+	i = 1;
 	if(ctdDChar > 0){
 		declaracao = declaracao + "\tchar ";
 		while(i < ctdDChar){
 			declaracao = declaracao + "TMP_CHAR_" + to_string(i) + ", ";
 			i++;
 		}
-		declaracao = declaracao + "TMP_CHAR_" + to_string(i) + ";\n";
-		i = 1;
+		declaracao = declaracao + "TMP_CHAR_" + to_string(i) + ";\n";		
 	}
+	i = 1;
+	if(ctdDString > 0){			
+		while(i <= ctdDString){
+			declaracao = declaracao + "\tchar * TMP_STRING_" + to_string(i) + ";\n";
+			i++;
+		}				
+	}
+	i = 1;
 	if(ctdDBool > 0){
-		declaracao = declaracao + "\tbool ";
+		declaracao = declaracao + "\tint ";
 		while(i < ctdDBool){
 			declaracao = declaracao + "TMP_BOOL_" + to_string(i) + ", ";
 			i++;
 		}
-		declaracao = declaracao + "TMP_BOOL_" + to_string(i) + ";\n";
-		i = 1;
+		declaracao = declaracao + "TMP_BOOL_" + to_string(i) + ";\n";		
 	}
 
 	return declaracao + "\n";
+}
+
+
+static int nRotulo = 0;
+
+string geraRotulo(){
+
+	nRotulo++;
+	return "ROTULO_" + to_string(nRotulo);
+
 }
 
 void atualizarPilhaContextos(Atributos a){
@@ -405,6 +431,7 @@ string verificaErros(Atributos $1, Atributos $3, int opcao){
 %token TOKEN_DOUBLE
 %token TOKEN_CHAR
 %token TOKEN_BOOL
+%token TOKEN_STR
 
 %token TOKEN_NULL
 %token TOKEN_VOID
@@ -414,6 +441,7 @@ string verificaErros(Atributos $1, Atributos $3, int opcao){
 %token TOKEN_SWITCH
 %token TOKEN_CASE
 %token TOKEN_DEFAULT
+%token TOKEN_IMP
   
 %token TOKEN_BREAK
 %token TOKEN_CONTINUE
@@ -432,6 +460,7 @@ string verificaErros(Atributos $1, Atributos $3, int opcao){
 %token TOKEN_BOOLEAN_FALSE
 %token TOKEN_BOOLEAN_TRUE
 %token TOKEN_CARACTERE
+%token TOKEN_STRING
 
 %token TOKEN_MAIOR
 %token TOKEN_MENOR
@@ -447,7 +476,12 @@ string verificaErros(Atributos $1, Atributos $3, int opcao){
 
 
 %token TOKEN_ATR
+%token TOKEN_SCANF
 
+%token TOKEN_COMENT
+%token TOKEN_COM_INT 
+%token TOKEN_COM_END 
+%token TOKEN_LINECOMENT
 
 %left TOKEN_E TOKEN_OU 
 %left TOKEN_MAIOR TOKEN_MENOR TOKEN_MAIORIGUAL TOKEN_MENORIGUAL TOKEN_DIF TOKEN_IGUAL 
@@ -462,19 +496,68 @@ string verificaErros(Atributos $1, Atributos $3, int opcao){
 
 %%
 
-S		    : TOKEN_BEGIN TOKEN_MAIN '(' ')' '{' BLOCO 
+S		    : TOKEN_BEGIN TOKEN_MAIN '(' ')' BLOCO_MAIN 
             {
-            	setarContexto(0, "", "");
+            	
             	$$.labelTemp = geraLabelFinal();
-				cout << "/*Compilador ITL*/\n" << "#include <iostream>\n#include<string.h>\n#include<stdio.h>\nint main(void){\n" <<
-				$$.labelTemp << $6.traducao << "\treturn 0;\n}" << endl; 							
+				cout << "/*Compilador ITL*/\n" << "#include <iostream>\n#include <string.h>\n#include <stdio.h>\nint main(void){\n" <<
+				$$.labelTemp << $5.traducao << "\treturn 0;\n}" << endl; 							
 				
 			}
-BLOCO		:  COMANDOS '}'
+
+BLOCO_MAIN	: EMP_MAIN '{' COMANDOS '}'
 			{
-				$$.traducao = $1.traducao;
+				$$.traducao = $3.traducao;
+			}
+			| BLOCO_NI
+			| BLOCO_LOOP
+			;
+
+EMP_MAIN 	:
+			{
+
+				//Empilha o Main
+				empilhaMapa(0,"","");
+				
+
+			}
+
+BLOCO_NI	: EMP_NI '{' COMANDOS '}'
+			{
+				$$.traducao = $3.traducao;
 			}
 			;
+
+EMP_NI 		:
+			{
+				//Empilha o Bloco não interrompível
+				empilhaMapa(0,"","");
+				
+
+			}
+
+BLOCO_LOOP	: EMP_LOOP '{' COMANDOS '}'
+			{
+				$$.traducao = $3.traducao;
+			}
+			;
+
+BLOCO_SWITCH: EMP_LOOP '(' CASES ')'
+			{
+				
+
+				$$.traducao = $3.traducao;
+			}
+			;	
+
+EMP_LOOP	:
+			{
+				//Empilha o Bloco interrompível
+				empilhaMapa(1,geraRotulo(),geraRotulo());
+				
+
+			}
+
 								
 
 COMANDOS	: COMANDO COMANDOS
@@ -498,17 +581,20 @@ COMANDO 	: TOKEN_NOMEVAR TOKEN_ATR E ';'
 			{
 
 				$$.traducao = verificaErros($1, $3, 2);
-		
 			
 			}
 			| DCL ';'
+			| CONCATENACAO ';'
 			| IF
+			| SWITCH
 			| WHILE
 			| DO_WHILE
 			| FOR
-			| SWITCH
 			| BREAK ';'
+			| SCANF ';'
+			| PRINT ';'
      	 	| CONTINUE ';'
+			| COMENT
 			;			
 
 DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
@@ -602,6 +688,45 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 							exit(1);		
 						}
 						$$.nomeVariavel = $2.nomeVariavel;
+						$$.labelTemp = geraLabelTemp($$.tipo);
+						$$.traducao = $4.traducao +  "\t" + $$.labelTemp + " = " + $4.labelTemp + ";\n" + $5.traducao; 
+
+						adicionaVariavelContexto($$);
+					}else{
+						indicaErro(MSG_ERRO_TIPO);
+						exit(1);
+					}
+
+				}
+
+			}
+			|TOKEN_STR TOKEN_NOMEVAR MLTVAR_STRING
+			{	
+				if(variavelExistente($2.nomeVariavel, 'd')){
+					$$.tipo = "string";
+					$$.valor = "null";
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
+					$$.traducao = $3.traducao;
+					adicionaVariavelContexto($$);
+				}
+
+			}	
+			| TOKEN_STR TOKEN_NOMEVAR TOKEN_ATR ES MLTVAR_STRING
+			{
+
+				if(variavelExistente($2.nomeVariavel, 'd')){
+					if(tipoGeral == 2){
+						$$.tipo = "string";
+						$$.valor = $4.valor;						
+
+						if($4.tipo != $$.tipo ){																
+							indicaErro(MSG_ERRO_TIPO);
+							exit(1);		
+						}
+						$$.tamanho = $4.tamanho;
+						$$.varTamString = $4.varTamString;
+						$$.nomeVariavel = $2.nomeVariavel;						
 						$$.labelTemp = geraLabelTemp($$.tipo);
 						$$.traducao = $4.traducao +  "\t" + $$.labelTemp + " = " + $4.labelTemp + ";\n" + $5.traducao; 
 
@@ -752,6 +877,39 @@ MLTVAR_CHAR	: ',' TOKEN_NOMEVAR MLTVAR_CHAR
 			}
 			;
 
+MLTVAR_STRING : ',' TOKEN_NOMEVAR MLTVAR_STRING
+			{
+				if(variavelExistente($2.nomeVariavel, 'd')){
+					$$.tipo = "string";
+					$$.valor = "null";
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
+					$$.traducao = "";
+
+					adicionaVariavelContexto($$);
+				}
+			}
+			| ',' TOKEN_NOMEVAR TOKEN_ATR ES MLTVAR_STRING
+			{
+				if(variavelExistente($2.nomeVariavel, 'd')){
+					$$.tipo = "string";
+					$$.valor = $4.valor;
+					$$.nomeVariavel = $2.nomeVariavel;
+					$$.labelTemp = geraLabelTemp($$.tipo);
+					$$.tamanho = $4.tamanho;
+					$$.varTamString = $4.varTamString;
+					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.labelTemp + " = " + $4.labelTemp + ";\n" ;
+					
+					adicionaVariavelContexto($$);
+				}
+			}
+			|
+			{
+				$$.traducao = "";
+			}
+			;
+
+
 MLTVAR_BOOL : ',' TOKEN_NOMEVAR MLTVAR_BOOL
 			{
 				if(variavelExistente($2.nomeVariavel, 'd')){
@@ -780,293 +938,255 @@ MLTVAR_BOOL : ',' TOKEN_NOMEVAR MLTVAR_BOOL
 			{
 				$$.traducao = "";
 			}
-			;			
-IF 		: TOKEN_IF '(' ERL ')' '{' BLOCO
-			{		
-				string sFimIF = "FIM_IF_" + to_string(ctdIf);
+			;
+
+COMENT      : TOKEN_MAIOR TOKEN_COMENT TOKEN_COM_END 
+			{
+				$$.traducao = "\n\t/*" + $2.traducao + "*/\n\n";
+			}
+			| TOKEN_COM_INT TOKEN_LINECOMENT
+			{
+				$$.traducao = "\n\t/" + $2.traducao + "\n";
+			}
+			;						
+
+IF 			: TOKEN_IF '(' ERL ')' BLOCO_NI
+			{	
+
+				string sFimIF = geraRotulo();
 					
-				setarContexto(0, "", sFimIF);
-				cout<<"Trad:"<<pilhaDeContextos.top().labelFim<<endl;
-				
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//IF COMEÇA\n" + $3.traducao +
-				"\t" + $$.labelTemp + " = " + $3.labelTemp + ";\n" +
-				"\tif(!" + $$.labelTemp + ") goto "+ sFimIF +";\n" + $6.traducao +
+				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
+				"\tif(!" + $$.labelTemp + ") goto "+ sFimIF +";\n" + $5.traducao +
 				"\n\t"+ sFimIF +":\n\t//IF TERMINA\n\n";
-				ctdIf += 1;
+				
 				desempilhaMapa();
 			}
-			| 
-  			TOKEN_IF '(' ERL ')' '{' BLOCO ELSEIF
+			| TOKEN_IF '(' ERL ')' BLOCO_NI ELSEIF
 			{		
-        		string sFimIF = "FIM_IF_" + to_string(ctdIf);
-				string sElseIF = "ELSE_IF_" + to_string(ctdEIf);
-				
-				setarContexto(0, "", sFimIF);
-				cout<<pilhaDeContextos.top().labelFim<<endl; 
+        		string sFimIF = geraRotulo();
+				string sElseIF = geraRotulo(); 
 				
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
-				"\t" + $$.labelTemp + " = " + $3.labelTemp + ";\n" +
+				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
 				"\tif(!" + $$.labelTemp + ") goto " + sElseIF +"\n" +
-				$6.traducao + "\tgoto "+ sFimIF +";\n" + $7.traducao;        	
-        		ctdIf += 1;
-        		ctdEIf += 1;
+				$5.traducao + "\tgoto "+ sFimIF +";\n" + $6.traducao;        	
+        		
         		desempilhaMapa();
 
 			}
-			| TOKEN_IF '(' ERL ')' '{' BLOCO ELSE
+			| TOKEN_IF '(' ERL ')' BLOCO_NI ELSE
 			{		
-        		string sFimIF = "FIM_IF_" + to_string(ctdIf);        	
-        		string sElse = "ELSE_" + to_string(ctdElse) ;
-        
-				setarContexto(0, "", sFimIF);
-				cout<<pilhaDeContextos.top().labelFim<<endl;
-
+        		string sFimIF = geraRotulo();       	
+        		string sElse = geraRotulo();
+				
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
-				"\t" + $$.labelTemp + " = " + $3.labelTemp + ";\n" +
+				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
 				"\tif(!" + $$.labelTemp + ") goto "+  sElse + ";\n" +
-				$6.traducao + $7.traducao; 
+				$5.traducao + $6.traducao;
+
 				desempilhaMapa();
        		 	
 			}
 			;
 
-ELSE: TOKEN_ELSE '{' BLOCO 
+ELSE: 		TOKEN_ELSE BLOCO_NI
 			{
-  				string sFimIF = "FIM_IF_" + to_string(ctdIf);        	        
-  				string sElse = "ELSE_" + to_string(ctdElse) ;
-
-  				setarContexto(0, "", sElse);
-  				cout<<pilhaDeContextos.top().labelFim<<endl;
-
+  				string sFimIF = geraRotulo();      	        
+  				string sElse = geraRotulo();  			
+  				
   				$$.traducao = "\n\tgoto " + sFimIF + ";\n"+
-				"\n\t//ELSE COMEÇA\n\t"+ sElse + ":\n" + $3.traducao+"\t"+ sFimIF +":\n\t//ELSE TERMINA\n\t"+
+				"\n\t//ELSE COMEÇA\n\t"+ sElse + ":\n" + $2.traducao+"\t" + 
+				sFimIF +":\n\t//ELSE TERMINA\n\t"+
 				"//IF TERMINA\n\n";
-  				ctdElse += 1;
+  				
   				desempilhaMapa();
 			}
 			;
-ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' '{' BLOCO
+ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO_NI
 			{		
-				string sFimIF = "FIM_IF_" + to_string(ctdIf);
-				string sElseIF = "ELSE_IF_" + to_string(ctdEIf);  				
-
-      			setarContexto(0, "", sFimIF);
-      			cout<<pilhaDeContextos.top().labelFim<<endl;
-				
+				string sFimIF = geraRotulo();
+				string sElseIF = geraRotulo();      			
+      							
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//ELSEIF COMEÇA\n\t" + sElseIF + ":\n"+$3.traducao +
-				"\t" + $$.labelTemp + " = " + $3.labelTemp + ";\n" +
+				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
 				"\tif(!" + $$.labelTemp + ") goto " + sFimIF + ";\n" +
-				$6.traducao + 
+				$5.traducao + 
 				"\n\t" + sFimIF + ":\n\t//ELSEIF TERMINA\n\t//IF TERMINA\n\n";
-				ctdEIf += 1;
+				
 				desempilhaMapa();				
 			}
-			| TOKEN_ELSEIF '(' ERL ')' '{' BLOCO ELSEIF
+			| TOKEN_ELSEIF '(' ERL ')' BLOCO_NI ELSEIF
 			{		
-				string sFimIF = "FIM_IF_" + to_string(ctdIf);
-				string sElseIF = "ELSE_IF_" + to_string(ctdEIf);  				
-
-        		setarContexto(0, "", sFimIF);
-        		cout<<pilhaDeContextos.top().labelFim<<endl;
-				
+				string sFimIF = geraRotulo();
+				string sElseIF = geraRotulo(); 				
+        						
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//ELSEIF COMEÇA\n\t" + sElseIF + ":\n"+$3.traducao +
-				"\t" + $$.labelTemp + " = " + $3.labelTemp + ";\n" +
+				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
 				"\tif(!" + $$.labelTemp + ") goto " + sFimIF + ";\n" +
-				$6.traducao + 
-				"\n\t" + sFimIF + ":\n\t//ELSEIF TERMINA\n\t//IF TERMINA\n\n";
-				ctdEIf += 1;
+				$5.traducao + "\n\t" + sFimIF + ":\n\t//ELSEIF TERMINA\n\t//IF TERMINA\n\n";
+				
 				desempilhaMapa();			
 			}
-			| TOKEN_ELSEIF '(' ERL ')' '{' BLOCO ELSE
+			| TOKEN_ELSEIF '(' ERL ')' BLOCO_NI ELSE
 			{
-        		string sFimIF = "FIM_IF_" + to_string(ctdIf);
-				string sElse = "ELSE_" + to_string(ctdElse) ;
-				string sElseIF = "ELSE_IF_" + to_string(ctdEIf);  				
+        		string sFimIF = geraRotulo();
+				string sElse = geraRotulo();
+				string sElseIF = geraRotulo();  				
 
-				setarContexto(0, "", sFimIF);
-				cout<<pilhaDeContextos.top().labelFim<<endl;
-
+				
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//" + sElseIF +" COMEÇA\n\tELSEIF:\n"+ $3.traducao +
-				"\t" + $$.labelTemp + " = " + $3.labelTemp + ";\n" +
+				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
 				"\tif(!" + $$.labelTemp + ") goto " + sElse +";\n" +
-				$6.traducao + $7.traducao;
+				$5.traducao + $6.traducao;
 				desempilhaMapa();
 			}
 			;
 
-WHILE 		: TOKEN_WHILE '(' ERL ')' '{' BLOCO
+WHILE 		: TOKEN_WHILE '(' ERL ')' BLOCO_LOOP
 			{	
-  				string sWhile = "WHILE_" + to_string(ctdWhile);
-  				string sFWhile = "FIM_WHILE_" + to_string(ctdWhile);
-
-				setarContexto(1, sWhile, sFWhile);
-				cout<<pilhaDeContextos.top().labelFim<<endl;
-
+  				string sWhile = pilhaDeContextos.top().rotuloInicio;
+  				string sFWhile = pilhaDeContextos.top().rotuloFim;				
+				
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//WHILE COMEÇA\n"+ $3.traducao +
-				"\t" + $$.labelTemp + " = " + $3.labelTemp + ";\n" +
-				"\t" + "if("+$$.labelTemp+"){\n\t"+ sWhile +":\n"+$6.traducao+"\t}if("+$$.labelTemp+") goto "+ sWhile +";\n\t"+ sFWhile + ":\n\t//WHILE TERMINA\n";
-  				ctdWhile += 1;
+				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
+				"\t" + sWhile +":\n\t" + "if("+$$.labelTemp+")goto "+sFWhile+"\n"+$5.traducao+"\tgoto " + 
+				sWhile +";\n\t"+ sFWhile + ":\n\t//WHILE TERMINA\n";
+  				
   				desempilhaMapa();
 			}
 			;
 
-DO_WHILE	: TOKEN_DO '{' BLOCO TOKEN_WHILE '(' ERL ')' ';'
-			{
-				string sDWhile = "DO_WHILE_" + to_string(ctdWhile);
-  				string sFDWhile = "FIM_DO_WHILE_" + to_string(ctdWhile);
+DO_WHILE 	: TOKEN_DO BLOCO_LOOP '(' ERL ')' ';'
+			{	
+  				string sDWhile = pilhaDeContextos.top().rotuloInicio;
+  				string sFDWhile = pilhaDeContextos.top().rotuloFim;				
 				
-				setarContexto(1, sDWhile, sFDWhile);				
-				cout<<pilhaDeContextos.top().labelFim<<endl;
-
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = "\n\t//DO WHILE COMEÇA\n"+ $6.traducao +
-				"\t" + $$.labelTemp + " = !" + $6.labelTemp + ";\n" +
-				"\t" + "\n\t"+ sDWhile +":\n"+$3.traducao+"\tif("+$$.labelTemp+") goto "+ sDWhile +";\n\t"+ sFDWhile + ":\n\t//DO WHILE TERMINA\n";
-  				ctdWhile += 1;
+				$$.traducao = "\n\t//DO_WHILE COMEÇA\n"+ $4.traducao +
+				"\t" + $$.labelTemp + " = !" + $4.labelTemp + ";\n" +
+				"\t" + sDWhile +":\n"+$2.traducao+"\tif("+$$.labelTemp+") goto "+sFDWhile+";\n\tgoto " + 
+				sDWhile +";\n\t"+ sFDWhile + ":\n\t//DO_WHILE TERMINA\n";
+  				
   				desempilhaMapa();
 			}
 			;
 
-FOR			: TOKEN_FOR '('COMANDO ERL ';' FOR_INC ')' '{' BLOCO		
+FOR			: TOKEN_FOR '('COMANDO ERL ';' E ')' BLOCO_LOOP		
 			{
-				string sFor = "FOR_" + to_string(ctdFor);
-  				string sFFor = "FIM_DO_FOR_" + to_string(ctdFor);
-
-				setarContexto(1, sFor, sFFor);
-				cout<<pilhaDeContextos.top().labelFim<<endl;
+				string sFor = pilhaDeContextos.top().rotuloInicio;
+  				string sFFor = pilhaDeContextos.top().rotuloFim;	
 
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//FOR COMEÇA\n"+ $3.traducao + $4.traducao +
 				"\t" + $$.labelTemp + " = !" + $4.labelTemp + ";\n" +
-				"\t" + "if("+$$.labelTemp+")goto "+ sFFor +"\n\t"+ sFor +":\n"+$9.traducao + $6.traducao +"\tif("+$$.labelTemp+") goto "+ sFor +";\n\t"+ sFFor + ":\n\t//FOR TERMINA\n";
-  				ctdFor += 1;
+				"\t" + sFor +":\n"+ "\t" + "if("+$$.labelTemp+") goto "+ sFFor +";\n"+$8.traducao + $6.traducao + "\tgoto "+sFor+";\n\t"+ sFFor + ":\n\t//FOR TERMINA\n";
+  				
   				desempilhaMapa();
 			}
-						;
-FOR_INC     : E_BASICA '+''+'
-			{	
-				$$.tipo = "int";
-				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = "\t"+ $$.labelTemp + " = " + $1.labelTemp + " + 1;\n"
-							  +"\t" + $1.labelTemp + " = " + $$.labelTemp+ ";\n"; 
-			}
-			| E_BASICA '-''-'
-			{	
-				$$.tipo = "int";
-				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = "\t"+ $$.labelTemp + " = " + $1.labelTemp + " - 1;\n"
-							  +"\t" + $1.labelTemp + " = " + $$.labelTemp+ ";\n"; 
-			}
 			;
 
-SWITCH 		: TOKEN_SWITCH '(' E_BASICA ')' '{' CASES '}'
+SWITCH 		: TOKEN_SWITCH '('E_BASICA ',' BLOCO_SWITCH ')' ';'
 			{
-				switchPar = $3.traducao;
-				$$.traducao = "\t"+ $3.traducao + $6.traducao + "\n";
+
+				$$.traducao = "\n\t//SWITCH COMEÇA\n" + $5.traducao + "\t" + sFSwitch +":\n\t//SWITCH TERMINA\n";
+
+				desempilhaMapa();
 			}
 			;
 
-CASES 		: CASE CASES 
+CASES 		: CASE CASES
 			{
 				$$.traducao = $1.traducao + $2.traducao;
-			}	
-			| DEFAULT
-      		{
-        		$$.traducao = $1.traducao;
-      		}
-      		| CASE
+			}
+			|	DEFAULT 
+			{
+				$$.traducao = $1.traducao;	
+			}
+			| CASE
 			{
 				$$.traducao = $1.traducao;
 			}
-			;
+
 			
-CASE 		: TOKEN_CASE  CASE_VALUE  ':' COMANDOS
+CASE 		: TOKEN_CASE  CASE_VALUE TOKEN_IMP COMANDOS
 			{
+
+				string sFimIF = geraRotulo();
+  				sFSwitch = pilhaDeContextos.top().rotuloFim;
+
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = "\t" + $2.traducao + "if( "+$2.labelTemp+ " == "+switchPar+")"+ $4.traducao ;
+				$$.traducao = $2.traducao + "\t"+ $$.labelTemp + " = !"+ $2.labelTemp + "\n\tif( "+$$.labelTemp+") goto " +sFimIF + ";\n"+ $4.traducao + "\n\t" + sFimIF +":\n";
 			}
 			;
+DEFAULT     : TOKEN_DEFAULT TOKEN_IMP COMANDOS 
+			{
+				$$.traducao = $3.traducao + "\n";
+			}
 
 CASE_VALUE	: E_BASICA
 			{
-				$$.tipo = $1.tipo;
-				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = "\t" + $$.labelTemp + " = " + $1.labelTemp + ";\n";
-			}
 
-DEFAULT 	: TOKEN_DEFAULT ':' COMANDOS
-			{
-				$$.traducao = $3.traducao;
+				$$.tipo = $1.tipo;
+				$$.valor = $1.traducao;
+				$$.labelTemp = geraLabelTemp($$.tipo);				
+				$$.traducao = $$.valor + "\t" + $$.labelTemp + " = " + $1.labelTemp + " == " + switchPar +";\n";
 			}
 			;
-
 
 BREAK       : TOKEN_BREAK
 			{
        			
-				cout<<"TAMANHO DA PILHA: "<<pilhaDeContextos.size()<<endl;
-        		PilhaContexto pilhaAux;
-        		while(!pilhaDeContextos.empty()){
-        			if(pilhaDeContextos.top().interrompivel){
-        				$$.traducao = "\n\t//BREAK\n\tgoto " + pilhaDeContextos.top().labelFim + ";\n";
+				PilhaContexto copiaPilha = pilhaDeContextos;
+        		while(!copiaPilha.empty()){
+        			if(copiaPilha.top().interrompivel == 1){
+        				$$.traducao = "\t//BREAK\n\tgoto " + copiaPilha.top().rotuloFim + ";\n";
+        				
         				break;
         			}
-        			else if(pilhaDeContextos.size() == 1){
+        			if(copiaPilha.size() == 1){
         				indicaErro(MSG_ERRO_CONTEXTONAOINTERROMPIVEL);
 						exit(1);
         			}
-        			else{
-        				pilhaAux.push(pilhaDeContextos.top());
-        				pilhaDeContextos.pop();
-        			}
-        		}
-        		while(!pilhaAux.empty()){
-
-        			pilhaDeContextos.push(pilhaAux.top());
-        			pilhaAux.pop();
+        			
+        			copiaPilha.pop();
         			
         		}
-
+        		
       		}
 
 CONTINUE 	: TOKEN_CONTINUE
 			{
-				PilhaContexto pilhaAux;
-        		while(!pilhaDeContextos.empty()){
-        			if(pilhaDeContextos.top().interrompivel){
-        				$$.traducao = "\n\t//CONTINUE\n\tgoto " + pilhaDeContextos.top().labelInicio + ";\n";
+				PilhaContexto copiaPilha = pilhaDeContextos;
+        		while(!copiaPilha.empty()){
+        			if(copiaPilha.top().interrompivel == 1){
+        				$$.traducao = "\t//CONTINUE\n\tgoto " + copiaPilha.top().rotuloInicio + ";\n";
+        				
         				break;
         			}
-        			else if(pilhaDeContextos.size() == 1){
+        			if(copiaPilha.size() == 1){
         				indicaErro(MSG_ERRO_CONTEXTONAOINTERROMPIVEL);
 						exit(1);
         			}
-        			else{
-        				pilhaAux.push(pilhaDeContextos.top());
-        				pilhaDeContextos.pop();
-        			}
-        		}
-        		while(!pilhaAux.empty()){
-
-        			pilhaDeContextos.push(pilhaAux.top());
-        			pilhaAux.pop();
+        			
+        			copiaPilha.pop();
         			
         		}
 			}
@@ -1202,7 +1322,7 @@ ERL         : '(' ERL ')'
 					$$.labelTemp + " = " + $1.labelTemp + " <= " + labelCasting +
 					";\n";
 				}
-				else{		
+				else{		EL:
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
@@ -1546,11 +1666,266 @@ E 			: '(' E ')'
 				$$.traducao = $2.traducao + "\t" + $$.nomeVariavel + " = -" + $2.nomeVariavel +
 				";\n";			
 			}
+			| E '+''+'
+			{
+				$$.tipo = $1.tipo;
+				$$.labelTemp = geraLabelTemp($$.tipo);
+				$$.traducao = $1.traducao + "\t" + $$.labelTemp + " = " + $1.labelTemp + " + 1 ;\n";
+			}
+			| E '-''-'
+			{
+				$$.tipo = $1.tipo;
+				$$.labelTemp = geraLabelTemp($$.tipo);
+				$$.traducao = $1.traducao + "\t" + $$.labelTemp + " = -" + $1.labelTemp + " - 1 ;\n";
+			}
 			| E_BASICA
 			{ 
 				$$.traducao = $1.traducao;
 			}
 			;
+
+ES 			: TOKEN_STRING 
+			{
+				tipoGeral = 2;
+				$$.tipo = "string";
+				$$.labelTemp = geraLabelTemp($$.tipo);
+				
+				//remover aspas 	
+				string removerAspas = $1.traducao;
+				string semAspas = $1.traducao.erase(0, 1);
+				int lenSemAspas = semAspas.length() - 1;
+				$$.valor  = semAspas.erase(lenSemAspas, 1); //valor sem aspas
+				$$.tamanho = $$.valor.length() + 1;					
+
+				$$.varTamString	= geraLabelTemp("string_tam");
+				$$.traducao = "\t" + $$.varTamString + " = " + to_string($$.tamanho) + ";\n\t" + $$.labelTemp + " = (char*)malloc(" + 
+				$$.varTamString + " * sizeof(char));\n\t" + "strcat(" + $$.labelTemp + ", '" + $$.valor + "')" +
+				";\n";
+			}			
+			| TOKEN_NOMEVAR
+			{
+
+                if(variavelExistente($1.nomeVariavel, 'e')){ //Se a variável existir...
+                	Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+					if(c.mapa[$1.nomeVariavel].tipo == "string"){
+						if(c.mapa[$1.nomeVariavel].valor != "null"){						
+
+							$$.nomeVariavel = $1.nomeVariavel;
+							$$.labelTemp = pilhaDeContextos.top().mapa[$$.nomeVariavel].labelTemp;							
+							$$.valor = pilhaDeContextos.top().mapa[$$.nomeVariavel].valor;
+							$$.tipo = pilhaDeContextos.top().mapa[$$.nomeVariavel].tipo;
+							$$.tamanho =pilhaDeContextos.top().mapa[$$.nomeVariavel].tamanho;
+							$$.varTamString = pilhaDeContextos.top().mapa[$$.nomeVariavel].varTamString;
+							$$.traducao = ""; 
+
+						}
+						else{
+							std::cout <<c.mapa[$1.nomeVariavel].nomeVariavel<<MSG_ERRO_INICIALIZADA <<std::endl<<"Linea "<<ctdLinhas<< std::endl;
+							exit(1);															
+						}
+					}
+					else{
+						indicaErro(MSG_ERRO_TIPO);
+						exit(1);									
+					}
+				}
+				else{
+
+					indicaErro(MSG_ERRO_NDECLARADA);
+					exit(1);									
+				}
+			}
+			;
+
+PRINT 		: TOKEN_PRINT '(' CONTEUDO_PRINT ')'
+			{
+				$$.traducao = $3.traducao;
+			}
+
+
+CONTEUDO_PRINT: TOKEN_NUM_INT MAIS_PRINT 
+				{
+					$$.labelTemp = geraLabelTemp("int");				
+					$$.traducao = "\t" + $$.labelTemp + " = " + $1.valor + ";\n\tcout << " + $$.labelTemp + " << endl;\n" + $2.traducao;
+				}
+				| TOKEN_NUM_FLOAT MAIS_PRINT 
+				{
+					$$.labelTemp = geraLabelTemp("float");				
+					$$.traducao = "\t" + $$.labelTemp + " = " + $1.valor + ";\n\tcout << " + $$.labelTemp + " << endl;\n" + $2.traducao;
+				}
+				| TOKEN_BOOL MAIS_PRINT 
+				{
+					$$.labelTemp = geraLabelTemp("bool");				
+					$$.traducao = "\t" + $$.labelTemp + " = " + $1.valor + ";\n\tcout << " + $$.labelTemp + " << endl;\n" + $2.traducao;
+				}
+				| TOKEN_STRING MAIS_PRINT
+				{
+					$$.labelTemp = geraLabelTemp("string");	
+					$$.varTamString = geraLabelTemp("string_tam");			
+
+					//remover aspas 	
+					string removerAspas = $1.traducao;
+					string semAspas = $1.traducao.erase(0, 1);
+					int lenSemAspas = semAspas.length() - 1;
+					$$.valor  = semAspas.erase(lenSemAspas, 1); //valor sem aspas
+					$$.tamanho = $$.valor.length() + 1;
+
+					$$.traducao = "\n\t" + $$.varTamString + " = " + to_string($$.tamanho) + ";\n\t" + $$.labelTemp + " = (char*)malloc(" + 
+					$$.varTamString + " * sizeof(char));\n\t" + "strcat(" + $$.labelTemp + ", '" + $$.valor + "')" +
+					";\n\tcout << " + $$.labelTemp + " << endl;\n" + $2.traducao;
+				}
+				| TOKEN_CHAR MAIS_PRINT 
+				{
+					$$.labelTemp = geraLabelTemp("char");				
+					$$.traducao = "\t" + $$.labelTemp + " = " + $1.valor + ";\n\tcout << " + $$.labelTemp + " << endl;\n" + $2.traducao;
+				}
+				| TOKEN_NOMEVAR MAIS_PRINT 
+				{
+					if(variavelExistente($1.nomeVariavel, 'e')){ //Se a variável existir...
+	                	Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+	                	if(c.mapa[$1.nomeVariavel].valor != "null"){      
+	                		$1.labelTemp = pilhaDeContextos.top().mapa[$$.nomeVariavel].labelTemp;		          		                		
+	                		$$.traducao = "\tcout << " + $1.labelTemp +" << endl;\n" + $2.traducao;
+	                	}
+						else {
+							std::cout <<c.mapa[$1.nomeVariavel].nomeVariavel<<MSG_ERRO_INICIALIZADA <<std::endl<<"Linea "<<ctdLinhas<< std::endl;
+							exit(1);	
+						}            
+	                }
+	                else{
+						indicaErro(MSG_ERRO_NDECLARADA);
+						exit(1);									
+					}	
+				}
+
+MAIS_PRINT:	',' CONTEUDO_PRINT
+			{
+				$$.traducao = $2.traducao;
+			}	
+			|	
+			{
+				$$.traducao = "";
+			}
+		
+SCANF 		: TOKEN_SCANF '(' TOKEN_NOMEVAR ')'
+			{
+				if(variavelExistente($1.nomeVariavel, 'e')){ //Se a variável existir...
+                	Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+                	if(c.mapa[$3.nomeVariavel].tipo == "int") {                		
+                		$$.traducao = "\tscanf(\"%d\", &" + c.mapa[$3.nomeVariavel].labelTemp + ");\n";
+                	}
+                	if(c.mapa[$3.nomeVariavel].tipo == "float") {
+                		$$.traducao = "\tscanf(\"%f\", &" + c.mapa[$3.nomeVariavel].labelTemp + ");\n";
+                	}
+                	if(c.mapa[$3.nomeVariavel].tipo == "char") {
+                		$$.traducao = "\tscanf(\"%c\", &" + c.mapa[$3.nomeVariavel].labelTemp + ");\n";
+                	}
+                	if(c.mapa[$3.nomeVariavel].tipo == "string") {
+                		string varTamString = c.mapa[$3.nomeVariavel].varTamString;
+                		string var = c.mapa[$3.nomeVariavel].labelTemp;
+                		string varT = geraLabelTemp("char");
+                		string numVarT = geraLabelTemp("string_tam");
+                		string rotI = "ROT_STR_LET_IN_" + to_string(nCL);
+                		string rotF = "ROT_STR_LET_FIM_" + to_string(nCL);
+
+                		$$.traducao = "\n\t" + numVarT + " = " + varTamString +";\n"
+                		"\tif (" + varTamString + " > 0) free(" + var + ");\n" +
+						"\t" + var + " = (char*) malloc(sizeof" + varTamString +" * (char));\n" +
+						"\t" + varTamString + " = 0;\n" + "\t" + rotI + ":\n" + 						
+						'\t' + varT + " = getchar();\n" + 
+						"\tif(" + varT + " == \'\\0\' || " + varT + " == \'\\n\') goto " + rotF + ";\n" +
+						'\t' + var + '[' + varTamString + "] = " + varT + ";\n" +
+						'\t' + varTamString + " = " + varTamString + " + 1;\n" +
+						"\tif(" + varTamString + " < " + numVarT + ") goto " + rotI + ";\n" +
+						'\t' + varTamString + " = " + varTamString + " + " + numVarT + ";\n" +
+						'\t' + var + " = (char*) realloc(" + var + ", " + varTamString + ");\n" + 
+						"\tgoto " + rotI + ";\n" + '\t' + rotF + ":\n" +
+						'\t' + varTamString + " = " + varTamString + " + 1;\n" +
+						'\t' + var + '[' + varTamString + "] = \'\\0\';\n";
+
+						
+                	}
+                	else{
+                		std::cout <<c.mapa[$3.nomeVariavel].nomeVariavel<<MSG_ERRO_INICIALIZADA <<std::endl<<"Linea "<<ctdLinhas<< std::endl;
+						exit(1);
+                	}
+                }
+                else{
+					indicaErro(MSG_ERRO_NDECLARADA);
+					exit(1);									
+				}	
+			}	
+
+CONCATENACAO : TOKEN_NOMEVAR TOKEN_ATR ES '.' ES
+			{	
+				if(variavelExistente($1.nomeVariavel, 'e')){ //Se a variável existir...
+                	Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+                	if(c.mapa[$1.nomeVariavel].tipo == "string") {
+						if(c.mapa[$1.nomeVariavel].valor != "null"){						
+
+							$1.labelTemp = pilhaDeContextos.top().mapa[$$.nomeVariavel].labelTemp;							
+							$1.valor = pilhaDeContextos.top().mapa[$$.nomeVariavel].valor;
+							$1.tipo = pilhaDeContextos.top().mapa[$$.nomeVariavel].tipo;
+							$1.tamanho = pilhaDeContextos.top().mapa[$$.nomeVariavel].tamanho;							
+							$1.varTamString = pilhaDeContextos.top().mapa[$$.nomeVariavel].varTamString;
+							$1.traducao = ""; 
+						}
+						else{
+							std::cout <<c.mapa[$1.nomeVariavel].nomeVariavel<<MSG_ERRO_INICIALIZADA <<std::endl<<"Linea "<<ctdLinhas<< std::endl;
+							exit(1);															
+						}
+					}
+					else{
+						indicaErro(MSG_ERRO_TIPO);
+						exit(1);									
+					}
+				}				
+				else{
+
+					indicaErro(MSG_ERRO_NDECLARADA);
+					exit(1);									
+				}	
+
+				if($1.tamanho >= $3.tamanho + $5.tamanho - 1) { //se for igual eu deixo o tamanho base, se for menor eu altero o tamanho					
+					$$.labelTemp = geraLabelTemp($1.tipo);	
+					$$.varTamString = geraLabelTemp("string_tam");
+					string concat = "";
+					concat = concat + $3.valor + $5.valor;
+					$1.valor = 	concat;
+					
+
+					adicionaVariavelContexto($1); 
+
+
+					$$.traducao = "\n" + $3.traducao + $5.traducao + 
+					"\t" + $$.varTamString + " = " + to_string($1.tamanho) + ";\n" +					
+					"\t" + $$.labelTemp + " = (char*)malloc(" + $$.varTamString + " * sizeof(char));\n" +					
+					"\tstrcat(" + $$.labelTemp + ", " + $3.labelTemp + ");\n" +
+					"\tstrcat(" + $$.labelTemp + ", " + $5.labelTemp + ");\n" +
+					"\tfree( " + $1.labelTemp + " );\n" +
+					"\t" + $1.labelTemp + " = (char*)malloc(" + $1.varTamString + " * sizeof(char));\n" +
+					"\t" + $1.labelTemp + " = " + $$.labelTemp + ";\n";
+				}
+				else {
+					$$.labelTemp = geraLabelTemp($1.tipo);	
+					string varTamString = geraLabelTemp("string_tam");
+					string concat = "";
+					concat = concat + $3.valor + $5.valor;
+					$1.valor = 	concat;				
+					$1.tamanho = $1.valor.length() - 1;
+
+					adicionaVariavelContexto($1); 
+
+					$$.traducao = "\n" + $3.traducao + $5.traducao + "\t" + varTamString + " = " + $3.varTamString + " + " + $5.varTamString + ";\n" +
+					"\tfree( " + $1.labelTemp + " );\n" +
+					"\t" + $1.labelTemp + " = (char*)malloc(" + varTamString + " * sizeof(char));\n" +					
+					"\tstrcat(" + $1.labelTemp + ", " + $3.labelTemp + ");\n" +
+					"\tstrcat(" + $1.labelTemp + ", " + $5.labelTemp + ");\n" ;					
+		
+					
+				}
+			}
+			;			
 
 E_BASICA	: TOKEN_NUM_INT
 			{
@@ -1572,19 +1947,19 @@ E_BASICA	: TOKEN_NUM_INT
 			}
 			| TOKEN_NOMEVAR
 			{
-				
+
                 if(variavelExistente($1.nomeVariavel, 'e')){ //Se a variável existir...
                 	Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
 					if(c.mapa[$1.nomeVariavel].tipo == "float" || c.mapa[$1.nomeVariavel].tipo == "int"){
-
 						if(c.mapa[$1.nomeVariavel].valor != "null"){						
+
 
 							$$.nomeVariavel = $1.nomeVariavel;
 							$$.labelTemp = pilhaDeContextos.top().mapa[$$.nomeVariavel].labelTemp;							
 							$$.valor = pilhaDeContextos.top().mapa[$$.nomeVariavel].valor;
 							$$.tipo = pilhaDeContextos.top().mapa[$$.nomeVariavel].tipo;
 							$$.traducao = ""; 
-
+							switchPar = $$.labelTemp;
 						}
 						else{
 							std::cout <<c.mapa[$1.nomeVariavel].nomeVariavel<<MSG_ERRO_INICIALIZADA <<std::endl<<"Linea "<<ctdLinhas<< std::endl;
@@ -1601,9 +1976,6 @@ E_BASICA	: TOKEN_NUM_INT
 					indicaErro(MSG_ERRO_NDECLARADA);
 					exit(1);									
 				}
-
-
-
 			}
 			| TOKEN_BOOLEAN_FALSE
 			{

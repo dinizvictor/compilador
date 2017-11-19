@@ -7,12 +7,16 @@ DIGITO [0-9]
 LETRA [A-Za-z_]
 CARACTERES [A-Za-z]
 CARACTER "'"({CARACTERES}|{DIGITO}+)"'"
+STRING  "'"({CARACTERES}|{ESPACO}|{DIGITO}+)*"'"
 
 DELIMITADOR {ESPACO}+
 NUM {DIGITO}+
 REAL {NUM}+("."{NUM}+)?
 NOMEVAR {LETRA}({LETRA}|{NUM})*
 BOOL [true]|[false]
+LINECOMENT "/"([^\"\n]|\\\")*
+COMENT ("//"((([^\"\n]|\\\")|\n)*)"|")
+
 
 %%
 
@@ -26,6 +30,7 @@ BOOL [true]|[false]
 "doppio"			{return TOKEN_DOUBLE;}
 "carat"				{return TOKEN_CHAR;}
 "boole"             {return TOKEN_BOOL;}
+"corda"				{return TOKEN_STR;}
 
 "nullo" 			{return TOKEN_NULL;}
 "vuoto" 			{return TOKEN_VOID;}
@@ -48,6 +53,7 @@ BOOL [true]|[false]
 
 "ritorno"			{return TOKEN_RETURN; }
 "stampare"			{return TOKEN_PRINT; }
+"leggere"			{return TOKEN_SCANF; }
 
 ">"					{return TOKEN_MAIOR; }	
 "<"					{return TOKEN_MENOR; }	
@@ -55,11 +61,9 @@ BOOL [true]|[false]
 "<="				{return TOKEN_MENORIGUAL; }	
 "=="				{return TOKEN_IGUAL; }	
 "!!"				{return TOKEN_DIF; }	
-
+"->"				{return TOKEN_IMP; }	
 
 "="					{return TOKEN_ATR; }
-
-
 
 "&&"				{return TOKEN_E; }
 "||"				{return TOKEN_OU; }
@@ -70,14 +74,19 @@ BOOL [true]|[false]
 "false"				{yylval.traducao = yytext; return TOKEN_BOOLEAN_FALSE; }
 "true"				{yylval.traducao = yytext; return TOKEN_BOOLEAN_TRUE; }
 
-[{]					{ empilhaMapa(); return *yytext; }
-[}]					{ return *yytext; }
-[()[\];,]			{ return *yytext; }	
+"</"				{return TOKEN_COM_INT;}
+"\\<"				{return TOKEN_COM_END;}
+
+{COMENT}			{ yylval.traducao = yytext; return TOKEN_COMENT; }
+{LINECOMENT}		{ yylval.traducao = yytext; return TOKEN_LINECOMENT; }
+[()[\];:,{}]		{ return *yytext; }	
 [+\-*/]				{ return *yytext; }
 {NUM}			    { yylval.traducao = yytext; return TOKEN_NUM_INT; }
 {REAL}				{ yylval.traducao = yytext; return TOKEN_NUM_FLOAT; }
 {CARACTER}			{ yylval.traducao = yytext; return TOKEN_CARACTERE; }
+{STRING}			{ yylval.traducao = yytext; return TOKEN_STRING; }
 {NOMEVAR}			{ yylval.nomeVariavel = yytext; return TOKEN_NOMEVAR; }
-.					{ *yytext; }
+.					{ return *yytext; }
+
 
 %%
