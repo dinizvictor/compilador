@@ -1047,7 +1047,7 @@ ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO_NI
 				
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = "\n\t//" + sElseIF +" COMEÇA\n\tELSEIF:\n"+ $3.traducao +
+				$$.traducao = "\n\t//ELSEIF COMEÇA\n\t"+sElseIF+":\n"+ $3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
 				"\tif(!" + $$.labelTemp + ") goto " + sElse +";\n" +
 				$5.traducao + $6.traducao;
@@ -1055,31 +1055,31 @@ ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO_NI
 			}
 			;
 
-WHILE 		: TOKEN_WHILE '(' ERL ')' BLOCO_LOOP
+WHILE 		: TOKEN_WHILE ERL BLOCO_LOOP
 			{	
   				string sWhile = pilhaDeContextos.top().rotuloInicio;
   				string sFWhile = pilhaDeContextos.top().rotuloFim;				
 				
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = "\n\t//WHILE COMEÇA\n"+ $3.traducao +
-				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
-				"\t" + sWhile +":\n\t" + "if("+$$.labelTemp+")goto "+sFWhile+"\n"+$5.traducao+"\tgoto " + 
+				$$.traducao = "\n\t//WHILE COMEÇA\n"+ $2.traducao +
+				"\t" + $$.labelTemp + " = !" + $2.labelTemp + ";\n" +
+				"\t" + sWhile +":\n\t" + "if("+$$.labelTemp+")goto "+sFWhile+"\n"+$3.traducao+"\tgoto " + 
 				sWhile +";\n\t"+ sFWhile + ":\n\t//WHILE TERMINA\n";
   				
   				desempilhaMapa();
 			}
 			;
 
-DO_WHILE 	: TOKEN_DO BLOCO_LOOP '(' ERL ')' ';'
+DO_WHILE 	: TOKEN_DO BLOCO_LOOP  ERL ';'
 			{	
   				string sDWhile = pilhaDeContextos.top().rotuloInicio;
   				string sFDWhile = pilhaDeContextos.top().rotuloFim;				
 				
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = "\n\t//DO_WHILE COMEÇA\n"+ $4.traducao +
-				"\t" + $$.labelTemp + " = !" + $4.labelTemp + ";\n" +
+				$$.traducao = "\n\t//DO_WHILE COMEÇA\n"+ $3.traducao +
+				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
 				"\t" + sDWhile +":\n"+$2.traducao+"\tif("+$$.labelTemp+") goto "+sFDWhile+";\n\tgoto " + 
 				sDWhile +";\n\t"+ sFDWhile + ":\n\t//DO_WHILE TERMINA\n";
   				
@@ -1144,9 +1144,9 @@ DEFAULT     : TOKEN_DEFAULT TOKEN_IMP COMANDOS
 CASE_VALUE	: E_BASICA
 			{
 
-				$$.tipo = $1.tipo;
+				$$.tipo = "bool";
 				$$.valor = $1.traducao;
-				$$.labelTemp = geraLabelTemp($$.tipo);				
+				$$.labelTemp = geraLabelTemp("bool");				
 				$$.traducao = $$.valor + "\t" + $$.labelTemp + " = " + $1.labelTemp + " == " + switchPar +";\n";
 			}
 			;
@@ -1201,6 +1201,7 @@ ERL         : '(' ERL ')'
 			{
 				$$.tipo = "bool";
 				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
+				//cout<< $1.labelTemp; exit(1);
 				string theCasting = ""; 
 
 				if(fazCasting == 1){					
@@ -1209,7 +1210,7 @@ ERL         : '(' ERL ')'
 
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + labelCasting + " > " + $3.labelTemp +
+					$$.labelTemp + " = " + $1.labelTemp + " > " + $3.labelTemp +
 					";\n";
 
 				}
@@ -1221,15 +1222,15 @@ ERL         : '(' ERL ')'
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
 					$$.labelTemp + " = " + $1.labelTemp + " > " + labelCasting +
 					";\n";
+					cout<< $1.labelTemp;
 				}
 				else{		
-
+					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
 					$$.labelTemp + " = " + $1.labelTemp + " > " + $3.labelTemp +
 					";\n";
 				}
-
 			}
 			| ERL TOKEN_MENOR ERL
 			{
@@ -1243,7 +1244,7 @@ ERL         : '(' ERL ')'
 
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + labelCasting + " < " + $3.labelTemp +
+					$$.labelTemp + " = " + $1.labelTemp + " < " + $3.labelTemp +
 					";\n";
 
 				}
@@ -1276,7 +1277,7 @@ ERL         : '(' ERL ')'
 
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + labelCasting + " >= " + $3.labelTemp +
+					$$.labelTemp + " = " + $1.labelTemp + " >= " + $3.labelTemp +
 					";\n";
 
 				}
@@ -1288,6 +1289,7 @@ ERL         : '(' ERL ')'
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
 					$$.labelTemp + " = " + $1.labelTemp + " >= " + labelCasting +
 					";\n";
+					
 				}
 				else{		
 					
@@ -1309,8 +1311,9 @@ ERL         : '(' ERL ')'
 
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + labelCasting + " <= " + $3.labelTemp +
+					$$.labelTemp + " = " + switchPar + " <= " + $3.labelTemp +
 					";\n";
+
 
 				}
 				else if(fazCasting == 2){
@@ -1319,14 +1322,14 @@ ERL         : '(' ERL ')'
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " <= " + labelCasting +
+					$$.labelTemp + " = " + switchPar + " <= " + labelCasting +
 					";\n";
 				}
 				else{		EL:
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " <= " + $3.labelTemp +
+					$$.labelTemp + " = " + switchPar + " <= " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -1670,13 +1673,13 @@ E 			: '(' E ')'
 			{
 				$$.tipo = $1.tipo;
 				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = $1.traducao + "\t" + $$.labelTemp + " = " + $1.labelTemp + " + 1 ;\n";
+				$$.traducao = $1.traducao + "\t" + $1.labelTemp + " = " + $1.labelTemp + " + 1 ;\n";
 			}
 			| E '-''-'
 			{
 				$$.tipo = $1.tipo;
 				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = $1.traducao + "\t" + $$.labelTemp + " = -" + $1.labelTemp + " - 1 ;\n";
+				$$.traducao = $1.traducao + "\t" + $1.labelTemp + " = -" + $1.labelTemp + " - 1 ;\n";
 			}
 			| E_BASICA
 			{ 
@@ -1785,7 +1788,7 @@ CONTEUDO_PRINT: TOKEN_NUM_INT MAIS_PRINT
 	                	Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
 	                	if(c.mapa[$1.nomeVariavel].valor != "null"){      
 	                		$1.labelTemp = pilhaDeContextos.top().mapa[$$.nomeVariavel].labelTemp;		          		                		
-	                		$$.traducao = "\tcout << " + $1.labelTemp +" << endl;\n" + $2.traducao;
+	                		$$.traducao = "\tcout << " + switchPar +" << endl;\n" + $2.traducao;
 	                	}
 						else {
 							std::cout <<c.mapa[$1.nomeVariavel].nomeVariavel<<MSG_ERRO_INICIALIZADA <<std::endl<<"Linea "<<ctdLinhas<< std::endl;

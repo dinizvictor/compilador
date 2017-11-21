@@ -1,17 +1,16 @@
 iniziare principale(){	
 	
 	corda a = 'bc';
-	
 
-	tutto b = 1;
+	tutto b = 0;
 
 	>//
 		tutto a = 2;
 	|\<
 
 	fare{
-		tutto b = 0;
-	}(b > 0);
+		tutto j = 10;
+	}(b <= 10);
 
 	per(b = 0; b <= 10; b++){
 		stampare(b);
@@ -22,14 +21,14 @@ iniziare principale(){
 	<// leggere(b);
 	
 	mentre(true){
-		se(b == 0){
+		se(b <= 10){
 			rompere;
-		}altrise(b > 0){
+		}altrise(b <= 10){
 			continuare;
 		}
 	}
 	
-	se(b == 0){
+	se(b <= 10){
 		tutto c = 0;
 	}altrise(b <= 10){
 		tutto c = 5;
