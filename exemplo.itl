@@ -14,11 +14,10 @@ iniziare principale(){
 
 	per(b = 0; b <= 10; b++){
 		se(b == 4){
-			stampare(b);
-		
+			stampare(b);		
+		}
 	}
 
-	}
 	se(b > 2){
 		tutto c = 0;
 	}altrise(b >= 5){
