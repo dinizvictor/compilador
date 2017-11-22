@@ -62,7 +62,7 @@ string MSG_ERRO_CONTEXTONAOINTERROMPIVEL = "\nErrore:\ncontesto non interrompibi
 void yyerror(string);
 
 static int ctdDInt = 0, ctdDFloat = 0, ctdDChar = 0, ctdDBool = 0, ctdDString = 0, ctdDStringTam = 0;
-static string switchPar, sSwitch,sFSwitch;
+static string switchPar, sFimIFs,sFSwitch;
 static int nCL = 0;
 static int fazCasting;
 static int tipoGeral;
@@ -954,12 +954,13 @@ IF 			: TOKEN_IF '(' ERL ')' BLOCO_NI
 			{	
 
 				string sFimIF = geraRotulo();
+
 					
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//IF COMEÇA\n" + $3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
-				"\tif(!" + $$.labelTemp + ") goto "+ sFimIF +";\n" + $5.traducao +
+				"\tif(" + $$.labelTemp + ") goto "+ sFimIF +";\n" + $5.traducao +
 				"\n\t"+ sFimIF +":\n\t//IF TERMINA\n\n";
 				
 				desempilhaMapa();
@@ -967,15 +968,14 @@ IF 			: TOKEN_IF '(' ERL ')' BLOCO_NI
 			| TOKEN_IF '(' ERL ')' BLOCO_NI ELSEIF
 			{		
 
-        		string sFimIF = geraRotulo();
 				string sElseIF = geraRotulo(); 
 				
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
-				"\tif(!" + $$.labelTemp + ") goto " + sElseIF +"\n" +
-				$5.traducao + "\tgoto "+ sFimIF +";\n\n\t" + sElseIF +":\n" + $6.traducao;        	
+				"\tif(" + $$.labelTemp + ") goto " + sElseIF +"\n" +
+				$5.traducao + "\tgoto "+ sFimIFs +";\n\n\t" + sElseIF +":\n" + $6.traducao + sFimIFs+ ":\n";        	
         		
         		desempilhaMapa();
 
@@ -989,7 +989,7 @@ IF 			: TOKEN_IF '(' ERL ')' BLOCO_NI
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
-				"\tif(!" + $$.labelTemp + ") goto "+  sElse + ";\n" +
+				"\tif(" + $$.labelTemp + ") goto "+  sElse + ";\n" +
 				$5.traducao + sElse +":\n" + $6.traducao;
 
 				desempilhaMapa();
@@ -1002,7 +1002,7 @@ ELSE: 		TOKEN_ELSE BLOCO_NI
   				string sFimIF = geraRotulo();      	        
   				string sElse = geraRotulo();  			
   				
-  				$$.traducao = "\n\t//ELSE COMEÇA\n" + $2.traducao+"\t" + 
+  				$$.traducao = "\t//ELSE COMEÇA\n" + $2.traducao+"\t" + 
 				sFimIF +":\n\t//ELSE TERMINA\n\t"+
 				"//IF TERMINA\n\n";
   				
@@ -1011,16 +1011,17 @@ ELSE: 		TOKEN_ELSE BLOCO_NI
 			;
 ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO_NI
 			{		
-				string sFimIF = geraRotulo();
+        		sFimIFs = pilhaDeContextos.top().rotuloFim;
+				
 				string sElseIF = geraRotulo();      			
       							
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = "\n\t//ELSEIF COMEÇA\n\t" + sElseIF + ":\n"+$3.traducao +
+				$$.traducao = "\t//ELSEIF COMEÇA\n"+$3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
-				"\tif(!" + $$.labelTemp + ") goto " + sFimIF + ";\n" +
+				"\tif(" + $$.labelTemp + ") goto " + sFimIFs + ";\n" +
 				$5.traducao + 
-				"\n\t" + sFimIF + ":\n\t//ELSEIF TERMINA\n\t//IF TERMINA\n\n";
+				"\n\t" + sFimIFs + ":\n\t//ELSEIF TERMINA\n\t//IF TERMINA\n\n";
 				
 				desempilhaMapa();				
 			}
@@ -1033,7 +1034,7 @@ ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO_NI
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//ELSEIF COMEÇA\n\t" + sElseIF + ":\n"+$3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
-				"\tif(!" + $$.labelTemp + ") goto " + sFimIF + ";\n" +
+				"\tif(" + $$.labelTemp + ") goto " + sFimIF + ";\n" +
 				$5.traducao + "\n\t" + sFimIF + ":\n\t//ELSEIF TERMINA\n\t//IF TERMINA\n\n";
 				
 				desempilhaMapa();			
@@ -1049,8 +1050,8 @@ ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO_NI
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\t//ELSEIF COMEÇA\n"+ $3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
-				"\tif(!" + $$.labelTemp + ") goto " + sElse +";\n" +
-				$5.traducao +"\t" +sElse+":\n"+ $6.traducao;
+				"\tif(" + $$.labelTemp + ") goto " + sElse +";\n" +
+				$5.traducao +"\n\t" +sElse+":\n"+ $6.traducao;
 				desempilhaMapa();
 			}
 			;
@@ -1200,9 +1201,9 @@ ERL         : '(' ERL ')'
  			| ERL TOKEN_MAIOR ERL
 			{
 				$$.tipo = "bool";
-				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = "";
 				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				fazCasting = tabelaDeTipos(c.mapa[$1.nomeVariavel].tipo, $3.tipo);
+				string theCasting = "";
 				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
@@ -1236,9 +1237,9 @@ ERL         : '(' ERL ')'
 			| ERL TOKEN_MENOR ERL
 			{
 				$$.tipo = "bool";
-				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = "";
 				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				fazCasting = tabelaDeTipos(c.mapa[$1.nomeVariavel].tipo, $3.tipo);
+				string theCasting = "";
 				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
@@ -1271,9 +1272,9 @@ ERL         : '(' ERL ')'
 			| ERL TOKEN_MAIORIGUAL ERL
 			{
 				$$.tipo = "bool";
-				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = "";
 				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				fazCasting = tabelaDeTipos(c.mapa[$1.nomeVariavel].tipo, $3.tipo);
+				string theCasting = "";
 				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
@@ -1307,9 +1308,9 @@ ERL         : '(' ERL ')'
 			| ERL TOKEN_MENORIGUAL ERL
 			{
 				$$.tipo = "bool";
-				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = "";
 				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				fazCasting = tabelaDeTipos(c.mapa[$1.nomeVariavel].tipo, $3.tipo);
+				string theCasting = "";
 				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
@@ -1343,9 +1344,9 @@ ERL         : '(' ERL ')'
 			| ERL TOKEN_DIF ERL
 			{
 				$$.tipo = "bool";
-				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = "";
 				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				fazCasting = tabelaDeTipos(c.mapa[$1.nomeVariavel].tipo, $3.tipo);
+				string theCasting = "";
 				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
@@ -1378,9 +1379,9 @@ ERL         : '(' ERL ')'
 			| ERL TOKEN_IGUAL ERL
 			{
 				$$.tipo = "bool";
-				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = "";
 				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				fazCasting = tabelaDeTipos(c.mapa[$1.nomeVariavel].tipo, $3.tipo);
+				string theCasting = "";
 				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
@@ -1413,9 +1414,9 @@ ERL         : '(' ERL ')'
 			| ERL TOKEN_E ERL
 			{
 				$$.tipo = "bool";
-				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = "";
 				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				fazCasting = tabelaDeTipos(c.mapa[$1.nomeVariavel].tipo, $3.tipo);
+				string theCasting = "";
 				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
@@ -1448,9 +1449,9 @@ ERL         : '(' ERL ')'
 			| ERL TOKEN_OU ERL
 			{
 				$$.tipo = "bool";
-				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = "";
 				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				fazCasting = tabelaDeTipos(c.mapa[$1.nomeVariavel].tipo, $3.tipo);
+				string theCasting = "";
 				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					

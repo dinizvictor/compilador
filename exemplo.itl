@@ -10,7 +10,7 @@ iniziare principale(){
 
 	fare{
 		tutto j = 10;
-	}(b <= 10);
+	}(b !! 10);
 
 	per(b = 0; b <= 10; b++){
 		stampare(b);
@@ -21,16 +21,16 @@ iniziare principale(){
 	<// leggere(b);
 	
 	mentre(true){
-		se(b <= 10){
+		se(b == 10){
 			rompere;
-		}altrise(b <= 10){
+		}altrise(b < 6){
 			continuare;
 		}
 	}
 	
-	se(b <= 10){
+	se(b > 2){
 		tutto c = 0;
-	}altrise(b <= 10){
+	}altrise(b >= 5){
 		tutto c = 5;
 	}altri{
 		tutto c = 20;
