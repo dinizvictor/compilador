@@ -724,11 +724,14 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 							indicaErro(MSG_ERRO_TIPO);
 							exit(1);		
 						}
+
 						$$.tamanho = $4.tamanho;
 						$$.varTamString = $4.varTamString;
 						$$.nomeVariavel = $2.nomeVariavel;						
-						$$.labelTemp = geraLabelTemp($$.tipo);
-						$$.traducao = $4.traducao +  "\t" + $$.labelTemp + " = " + $4.labelTemp + ";\n" + $5.traducao; 
+						$$.labelTemp = $4.labelTemp;
+						$$.varTamString	= $4.varTamString;
+
+						$$.traducao = $4.traducao + $5.traducao; 
 
 						adicionaVariavelContexto($$);
 					}else{
@@ -883,6 +886,7 @@ MLTVAR_STRING : ',' TOKEN_NOMEVAR MLTVAR_STRING
 					$$.tipo = "string";
 					$$.valor = "null";
 					$$.nomeVariavel = $2.nomeVariavel;
+
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = "";
 
@@ -893,12 +897,16 @@ MLTVAR_STRING : ',' TOKEN_NOMEVAR MLTVAR_STRING
 			{
 				if(variavelExistente($2.nomeVariavel, 'd')){
 					$$.tipo = "string";
+					
 					$$.valor = $4.valor;
-					$$.nomeVariavel = $2.nomeVariavel;
-					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.tamanho = $4.tamanho;
 					$$.varTamString = $4.varTamString;
-					$$.traducao = $5.traducao + $4.traducao + "\t" + $$.labelTemp + " = " + $4.labelTemp + ";\n" ;
+					$$.nomeVariavel = $2.nomeVariavel;						
+					$$.labelTemp = $4.labelTemp;
+					$$.varTamString	= $4.varTamString;
+
+
+					$$.traducao = $4.traducao + $5.traducao ;
 					
 					adicionaVariavelContexto($$);
 				}
@@ -974,8 +982,8 @@ IF 			: TOKEN_IF '(' ERL ')' BLOCO_NI
 				$$.labelTemp = geraLabelTemp($$.tipo);
 				$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
-				"\tif(" + $$.labelTemp + ") goto " + sElseIF +"\n" +
-				$5.traducao + "\tgoto "+ sFimIFs +";\n\n\t" + sElseIF +":\n" + $6.traducao + sFimIFs+ ":\n";        	
+				"\tif(" + $$.labelTemp + ") goto " + sElseIF +";\n" +
+				$5.traducao + "\tgoto "+ sFimIFs +";\n\n\t" + sElseIF +":\n" + $6.traducao;        	
         		
         		desempilhaMapa();
 
@@ -990,7 +998,7 @@ IF 			: TOKEN_IF '(' ERL ')' BLOCO_NI
 				$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
 				"\tif(" + $$.labelTemp + ") goto "+  sElse + ";\n" +
-				$5.traducao + sElse +":\n" + $6.traducao;
+				$5.traducao +"\t"+ sElse +":\n" + $6.traducao;
 
 				desempilhaMapa();
        		 	
@@ -999,11 +1007,11 @@ IF 			: TOKEN_IF '(' ERL ')' BLOCO_NI
 
 ELSE: 		TOKEN_ELSE BLOCO_NI
 			{
-  				string sFimIF = geraRotulo();      	        
+  				sFimIFs = geraRotulo();      	        
   				string sElse = geraRotulo();  			
   				
   				$$.traducao = "\t//ELSE COMEÇA\n" + $2.traducao+"\t" + 
-				sFimIF +":\n\t//ELSE TERMINA\n\t"+
+				sFimIFs +":\n\t//ELSE TERMINA\n\t"+
 				"//IF TERMINA\n\n";
   				
   				desempilhaMapa();
@@ -1011,7 +1019,7 @@ ELSE: 		TOKEN_ELSE BLOCO_NI
 			;
 ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO_NI
 			{		
-        		sFimIFs = pilhaDeContextos.top().rotuloFim;
+        		sFimIFs = geraRotulo();
 				
 				string sElseIF = geraRotulo();      			
       							
@@ -1051,7 +1059,7 @@ ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO_NI
 				$$.traducao = "\t//ELSEIF COMEÇA\n"+ $3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
 				"\tif(" + $$.labelTemp + ") goto " + sElse +";\n" +
-				$5.traducao +"\n\t" +sElse+":\n"+ $6.traducao;
+				$5.traducao + "\tgoto "+ sFimIFs +";\n\n\t" +sElse+":\n"+ $6.traducao;
 				desempilhaMapa();
 			}
 			;
@@ -1756,6 +1764,60 @@ ES 			: TOKEN_STRING
 			}
 			;
 
+
+CONCATENACAO : TOKEN_NOMEVAR TOKEN_ATR ES '.' ES
+			{	
+				if(variavelExistente($1.nomeVariavel, 'e')){ //Se a variável existir...
+                	Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+
+                	if(c.mapa[$1.nomeVariavel].tipo == "string") {
+						if(c.mapa[$1.nomeVariavel].valor != "null"){						
+
+							$1.labelTemp = pilhaDeContextos.top().mapa[$$.nomeVariavel].labelTemp;														
+							$1.tamanho = pilhaDeContextos.top().mapa[$$.nomeVariavel].tamanho;							
+							$1.varTamString = pilhaDeContextos.top().mapa[$$.nomeVariavel].varTamString;
+							$1.tipo = pilhaDeContextos.top().mapa[$$.nomeVariavel].tipo;
+
+						}
+						else{
+							$1.labelTemp = pilhaDeContextos.top().mapa[$$.nomeVariavel].labelTemp;														
+							$1.tamanho = 0;							
+							$1.varTamString = geraLabelTemp("string_tam");
+							$1.tipo = pilhaDeContextos.top().mapa[$$.nomeVariavel].tipo;
+						}
+						
+							$$.labelTemp = geraLabelTemp($1.tipo);	
+							string varTamString = geraLabelTemp("string_tam");
+							string concat = "";
+							concat = concat + $3.valor + $5.valor;
+							$1.valor = 	concat;				
+							$1.tamanho = $1.valor.length() - 1;
+
+							
+
+							$$.traducao = "\n\t//concatenacao\n" + $3.traducao + $5.traducao + "\n\t" + varTamString + " = " + $3.varTamString + " + " + $5.varTamString + ";\n" +
+							"\t" + $$.labelTemp + " = (char*)malloc(" + varTamString + " * sizeof(char));\n" +					
+							"\tstrcat(" + $$.labelTemp + ", " + $3.labelTemp + ");\n" +
+							"\tstrcat(" + $$.labelTemp + ", " + $5.labelTemp + ");\n" +
+							"\tfree( " + $1.labelTemp + " );\n" + 
+							"\t" + $1.labelTemp + " = (char*)malloc(" + varTamString + " * sizeof(char));\n" +
+							"\tstrcat(" + $1.labelTemp + ", " + $$.labelTemp + ");\n" + 
+							"\t"+ $1.varTamString + " = " + varTamString + ";\n";									
+										
+					}
+					else{
+						indicaErro(MSG_ERRO_TIPO);
+						exit(1);									
+					}
+				}				
+				else{
+
+					indicaErro(MSG_ERRO_NDECLARADA);
+					exit(1);									
+				}	
+			}
+			;
+
 PRINT 		: TOKEN_PRINT '(' CONTEUDO_PRINT ')'
 			{
 				$$.traducao = $3.traducao;
@@ -1804,7 +1866,7 @@ CONTEUDO_PRINT: TOKEN_NUM_INT MAIS_PRINT
 	                	Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
 	                	if(c.mapa[$1.nomeVariavel].valor != "null"){      
 	                		$1.labelTemp = pilhaDeContextos.top().mapa[$$.nomeVariavel].labelTemp;		          		                		
-	                		$$.traducao = "\tcout << " + switchPar +" << endl;\n" + $2.traducao;
+	                		$$.traducao = "\tcout << " + c.mapa[$1.nomeVariavel].labelTemp +" << endl;\n" + $2.traducao;
 	                	}
 						else {
 							std::cout <<c.mapa[$1.nomeVariavel].nomeVariavel<<MSG_ERRO_INICIALIZADA <<std::endl<<"Linea "<<ctdLinhas<< std::endl;
@@ -1873,78 +1935,7 @@ SCANF 		: TOKEN_SCANF '(' TOKEN_NOMEVAR ')'
 					indicaErro(MSG_ERRO_NDECLARADA);
 					exit(1);									
 				}	
-			}	
-
-CONCATENACAO : TOKEN_NOMEVAR TOKEN_ATR ES '.' ES
-			{	
-				if(variavelExistente($1.nomeVariavel, 'e')){ //Se a variável existir...
-                	Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
-                	if(c.mapa[$1.nomeVariavel].tipo == "string") {
-						if(c.mapa[$1.nomeVariavel].valor != "null"){						
-
-							$1.labelTemp = pilhaDeContextos.top().mapa[$$.nomeVariavel].labelTemp;							
-							$1.valor = pilhaDeContextos.top().mapa[$$.nomeVariavel].valor;
-							$1.tipo = pilhaDeContextos.top().mapa[$$.nomeVariavel].tipo;
-							$1.tamanho = pilhaDeContextos.top().mapa[$$.nomeVariavel].tamanho;							
-							$1.varTamString = pilhaDeContextos.top().mapa[$$.nomeVariavel].varTamString;
-							$1.traducao = ""; 
-						}
-						else{
-							std::cout <<c.mapa[$1.nomeVariavel].nomeVariavel<<MSG_ERRO_INICIALIZADA <<std::endl<<"Linea "<<ctdLinhas<< std::endl;
-							exit(1);															
-						}
-					}
-					else{
-						indicaErro(MSG_ERRO_TIPO);
-						exit(1);									
-					}
-				}				
-				else{
-
-					indicaErro(MSG_ERRO_NDECLARADA);
-					exit(1);									
-				}	
-
-				if($1.tamanho >= $3.tamanho + $5.tamanho - 1) { //se for igual eu deixo o tamanho base, se for menor eu altero o tamanho					
-					$$.labelTemp = geraLabelTemp($1.tipo);	
-					$$.varTamString = geraLabelTemp("string_tam");
-					string concat = "";
-					concat = concat + $3.valor + $5.valor;
-					$1.valor = 	concat;
-					
-
-					adicionaVariavelContexto($1); 
-
-
-					$$.traducao = "\n" + $3.traducao + $5.traducao + 
-					"\t" + $$.varTamString + " = " + to_string($1.tamanho) + ";\n" +					
-					"\t" + $$.labelTemp + " = (char*)malloc(" + $$.varTamString + " * sizeof(char));\n" +					
-					"\tstrcat(" + $$.labelTemp + ", " + $3.labelTemp + ");\n" +
-					"\tstrcat(" + $$.labelTemp + ", " + $5.labelTemp + ");\n" +
-					"\tfree( " + $1.labelTemp + " );\n" +
-					"\t" + $1.labelTemp + " = (char*)malloc(" + $1.varTamString + " * sizeof(char));\n" +
-					"\t" + $1.labelTemp + " = " + $$.labelTemp + ";\n";
-				}
-				else {
-					$$.labelTemp = geraLabelTemp($1.tipo);	
-					string varTamString = geraLabelTemp("string_tam");
-					string concat = "";
-					concat = concat + $3.valor + $5.valor;
-					$1.valor = 	concat;				
-					$1.tamanho = $1.valor.length() - 1;
-
-					adicionaVariavelContexto($1); 
-
-					$$.traducao = "\n" + $3.traducao + $5.traducao + "\t" + varTamString + " = " + $3.varTamString + " + " + $5.varTamString + ";\n" +
-					"\tfree( " + $1.labelTemp + " );\n" +
-					"\t" + $1.labelTemp + " = (char*)malloc(" + varTamString + " * sizeof(char));\n" +					
-					"\tstrcat(" + $1.labelTemp + ", " + $3.labelTemp + ");\n" +
-					"\tstrcat(" + $1.labelTemp + ", " + $5.labelTemp + ");\n" ;					
-		
-					
-				}
-			}
-			;			
+			}				
 
 E_BASICA	: TOKEN_NUM_INT
 			{

@@ -1,6 +1,6 @@
 iniziare principale(){	
 	
-	corda a = 'bc';
+	corda a = 'bc', altris = 'nan', out;
 
 	tutto b = 0;
 
@@ -13,21 +13,11 @@ iniziare principale(){
 	}(b !! 10);
 
 	per(b = 0; b <= 10; b++){
+		se(b == 4){
 		stampare(b);
 	}
 
-	a = 'oi' . 'au';
-
-	<// leggere(b);
-	
-	mentre(true){
-		se(b == 10){
-			rompere;
-		}altrise(b < 6){
-			continuare;
-		}
 	}
-	
 	se(b > 2){
 		tutto c = 0;
 	}altrise(b >= 5){
@@ -35,6 +25,24 @@ iniziare principale(){
 	}altri{
 		tutto c = 20;
 	}
+
+	a = 'oi' . 'au';
+
+	a = a.'ola';
+
+	out = a.altris;
+
+	<// leggere(b);
+	
+	mentre(true){
+		se(b == 10){
+			rompere;
+		}altri{
+			tutto c = 0;
+		}
+	}
+
+	
 
 	scelta (b, (
 		caso 9 -> b = 0; rompere; 
