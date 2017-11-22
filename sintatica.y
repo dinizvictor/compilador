@@ -706,6 +706,7 @@ DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
 					$$.tipo = "string";
 					$$.valor = "null";
 					$$.nomeVariavel = $2.nomeVariavel;
+					$$.varTamString = geraLabelTemp("string_tam");
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $3.traducao;
 					adicionaVariavelContexto($$);
@@ -886,7 +887,7 @@ MLTVAR_STRING : ',' TOKEN_NOMEVAR MLTVAR_STRING
 					$$.tipo = "string";
 					$$.valor = "null";
 					$$.nomeVariavel = $2.nomeVariavel;
-
+					$$.varTamString = geraLabelTemp("string_tam");
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = "";
 
@@ -1890,8 +1891,8 @@ MAIS_PRINT:	',' CONTEUDO_PRINT
 		
 SCANF 		: TOKEN_SCANF '(' TOKEN_NOMEVAR ')'
 			{
-				if(variavelExistente($1.nomeVariavel, 'e')){ //Se a variável existir...
-                	Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				if(variavelExistente($3.nomeVariavel, 'e')){ //Se a variável existir...
+                	Contexto c = retornarContextoDaVariavel($3.nomeVariavel);
                 	if(c.mapa[$3.nomeVariavel].tipo == "int") {                		
                 		$$.traducao = "\tscanf(\"%d\", &" + c.mapa[$3.nomeVariavel].labelTemp + ");\n";
                 	}
@@ -1903,16 +1904,17 @@ SCANF 		: TOKEN_SCANF '(' TOKEN_NOMEVAR ')'
                 	}
                 	if(c.mapa[$3.nomeVariavel].tipo == "string") {
                 		string varTamString = c.mapa[$3.nomeVariavel].varTamString;
+                	
                 		string var = c.mapa[$3.nomeVariavel].labelTemp;
                 		string varT = geraLabelTemp("char");
                 		string numVarT = geraLabelTemp("string_tam");
                 		string rotI = "ROT_STR_LET_IN_" + to_string(nCL);
                 		string rotF = "ROT_STR_LET_FIM_" + to_string(nCL);
 
-                		$$.traducao = "\n\t" + numVarT + " = " + varTamString +";\n"
-                		"\tif (" + varTamString + " > 0) free(" + var + ");\n" +
-						"\t" + var + " = (char*) malloc(sizeof" + varTamString +" * (char));\n" +
-						"\t" + varTamString + " = 0;\n" + "\t" + rotI + ":\n" + 						
+                		$$.traducao = "\tif (" + varTamString + " > 0) free(" + var + ");\n" +
+						"\t" + var + " = (char*) malloc(" + varTamString +" * sizeof(char));\n" +
+						"\t" + numVarT + " = " + varTamString + "\n" + 
+						"\t" + varTamString + " = 0;\n\t" + rotI + ":\n" + 						
 						'\t' + varT + " = getchar();\n" + 
 						"\tif(" + varT + " == \'\\0\' || " + varT + " == \'\\n\') goto " + rotF + ";\n" +
 						'\t' + var + '[' + varTamString + "] = " + varT + ";\n" +
@@ -1922,20 +1924,15 @@ SCANF 		: TOKEN_SCANF '(' TOKEN_NOMEVAR ')'
 						'\t' + var + " = (char*) realloc(" + var + ", " + varTamString + ");\n" + 
 						"\tgoto " + rotI + ";\n" + '\t' + rotF + ":\n" +
 						'\t' + varTamString + " = " + varTamString + " + 1;\n" +
-						'\t' + var + '[' + varTamString + "] = \'\\0\';\n";
-
-						
-                	}
-                	else{
-                		std::cout <<c.mapa[$3.nomeVariavel].nomeVariavel<<MSG_ERRO_INICIALIZADA <<std::endl<<"Linea "<<ctdLinhas<< std::endl;
-						exit(1);
-                	}
+						'\t' + var + '[' + varTamString + "] = \'\\0\';\n";						
+                	}        
                 }
                 else{
 					indicaErro(MSG_ERRO_NDECLARADA);
 					exit(1);									
 				}	
-			}				
+			}	
+
 
 E_BASICA	: TOKEN_NUM_INT
 			{
