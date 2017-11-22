@@ -966,6 +966,7 @@ IF 			: TOKEN_IF '(' ERL ')' BLOCO_NI
 			}
 			| TOKEN_IF '(' ERL ')' BLOCO_NI ELSEIF
 			{		
+
         		string sFimIF = geraRotulo();
 				string sElseIF = geraRotulo(); 
 				
@@ -974,7 +975,7 @@ IF 			: TOKEN_IF '(' ERL ')' BLOCO_NI
 				$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
 				"\tif(!" + $$.labelTemp + ") goto " + sElseIF +"\n" +
-				$5.traducao + "\tgoto "+ sFimIF +";\n" + $6.traducao;        	
+				$5.traducao + "\tgoto "+ sFimIF +";\n\n\t" + sElseIF +":\n" + $6.traducao;        	
         		
         		desempilhaMapa();
 
@@ -989,7 +990,7 @@ IF 			: TOKEN_IF '(' ERL ')' BLOCO_NI
 				$$.traducao = "\n\t//IF COMEÇA\n"+$3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
 				"\tif(!" + $$.labelTemp + ") goto "+  sElse + ";\n" +
-				$5.traducao + $6.traducao;
+				$5.traducao + sElse +":\n" + $6.traducao;
 
 				desempilhaMapa();
        		 	
@@ -1001,8 +1002,7 @@ ELSE: 		TOKEN_ELSE BLOCO_NI
   				string sFimIF = geraRotulo();      	        
   				string sElse = geraRotulo();  			
   				
-  				$$.traducao = "\n\tgoto " + sFimIF + ";\n"+
-				"\n\t//ELSE COMEÇA\n\t"+ sElse + ":\n" + $2.traducao+"\t" + 
+  				$$.traducao = "\n\t//ELSE COMEÇA\n" + $2.traducao+"\t" + 
 				sFimIF +":\n\t//ELSE TERMINA\n\t"+
 				"//IF TERMINA\n\n";
   				
@@ -1047,10 +1047,10 @@ ELSEIF  	: TOKEN_ELSEIF '(' ERL ')' BLOCO_NI
 				
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = "\n\t//ELSEIF COMEÇA\n\t"+sElseIF+":\n"+ $3.traducao +
+				$$.traducao = "\t//ELSEIF COMEÇA\n"+ $3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
 				"\tif(!" + $$.labelTemp + ") goto " + sElse +";\n" +
-				$5.traducao + $6.traducao;
+				$5.traducao +"\t" +sElse+":\n"+ $6.traducao;
 				desempilhaMapa();
 			}
 			;
@@ -1201,8 +1201,9 @@ ERL         : '(' ERL ')'
 			{
 				$$.tipo = "bool";
 				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				//cout<< $1.labelTemp; exit(1);
-				string theCasting = ""; 
+				string theCasting = "";
+				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
 					string labelCasting = geraLabelTemp("float");
@@ -1210,7 +1211,7 @@ ERL         : '(' ERL ')'
 
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " > " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " > " + $3.labelTemp +
 					";\n";
 
 				}
@@ -1220,7 +1221,7 @@ ERL         : '(' ERL ')'
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " > " + labelCasting +
+					$$.labelTemp + " = " + labelTemp + " > " + labelCasting +
 					";\n";
 					cout<< $1.labelTemp;
 				}
@@ -1228,7 +1229,7 @@ ERL         : '(' ERL ')'
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " > " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " > " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -1236,7 +1237,9 @@ ERL         : '(' ERL ')'
 			{
 				$$.tipo = "bool";
 				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = ""; 
+				string theCasting = "";
+				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
 					string labelCasting = geraLabelTemp("float");
@@ -1244,7 +1247,7 @@ ERL         : '(' ERL ')'
 
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " < " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " < " + $3.labelTemp +
 					";\n";
 
 				}
@@ -1254,14 +1257,14 @@ ERL         : '(' ERL ')'
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " < " + labelCasting +
+					$$.labelTemp + " = " + labelTemp + " < " + labelCasting +
 					";\n";
 				}
 				else{		
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " < " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " < " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -1269,7 +1272,9 @@ ERL         : '(' ERL ')'
 			{
 				$$.tipo = "bool";
 				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = ""; 
+				string theCasting = "";
+				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
 					string labelCasting = geraLabelTemp("float");
@@ -1277,7 +1282,7 @@ ERL         : '(' ERL ')'
 
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " >= " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " >= " + $3.labelTemp +
 					";\n";
 
 				}
@@ -1287,7 +1292,7 @@ ERL         : '(' ERL ')'
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " >= " + labelCasting +
+					$$.labelTemp + " = " + labelTemp + " >= " + labelCasting +
 					";\n";
 					
 				}
@@ -1295,7 +1300,7 @@ ERL         : '(' ERL ')'
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " >= " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " >= " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -1303,7 +1308,9 @@ ERL         : '(' ERL ')'
 			{
 				$$.tipo = "bool";
 				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = ""; 
+				string theCasting = "";
+				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
 					string labelCasting = geraLabelTemp("float");
@@ -1311,7 +1318,7 @@ ERL         : '(' ERL ')'
 
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + switchPar + " <= " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " <= " + $3.labelTemp +
 					";\n";
 
 
@@ -1322,14 +1329,14 @@ ERL         : '(' ERL ')'
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + switchPar + " <= " + labelCasting +
+					$$.labelTemp + " = " + labelTemp + " <= " + labelCasting +
 					";\n";
 				}
 				else{		EL:
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.labelTemp + " = " + switchPar + " <= " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " <= " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -1337,7 +1344,9 @@ ERL         : '(' ERL ')'
 			{
 				$$.tipo = "bool";
 				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = ""; 
+				string theCasting = "";
+				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
 					string labelCasting = geraLabelTemp("float");
@@ -1345,7 +1354,7 @@ ERL         : '(' ERL ')'
 
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + labelCasting + " != " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " != " + $3.labelTemp +
 					";\n";
 
 				}
@@ -1355,14 +1364,14 @@ ERL         : '(' ERL ')'
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " != " + labelCasting +
+					$$.labelTemp + " = " + labelTemp + " != " + labelCasting +
 					";\n";
 				}
 				else{		
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " != " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " != " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -1370,7 +1379,9 @@ ERL         : '(' ERL ')'
 			{
 				$$.tipo = "bool";
 				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = ""; 
+				string theCasting = "";
+				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
 					string labelCasting = geraLabelTemp("float");
@@ -1378,7 +1389,7 @@ ERL         : '(' ERL ')'
 
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + labelCasting + " == " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " == " + $3.labelTemp +
 					";\n";
 
 				}
@@ -1388,14 +1399,14 @@ ERL         : '(' ERL ')'
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " == " + labelCasting +
+					$$.labelTemp + " = " + labelTemp + " == " + labelCasting +
 					";\n";
 				}
 				else{		
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " == " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " == " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -1403,7 +1414,9 @@ ERL         : '(' ERL ')'
 			{
 				$$.tipo = "bool";
 				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = ""; 
+				string theCasting = "";
+				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
 					string labelCasting = geraLabelTemp("float");
@@ -1411,7 +1424,7 @@ ERL         : '(' ERL ')'
 
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + labelCasting + " && " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " && " + $3.labelTemp +
 					";\n";
 
 				}
@@ -1421,14 +1434,14 @@ ERL         : '(' ERL ')'
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " && " + labelCasting +
+					$$.labelTemp + " = " + labelTemp + " && " + labelCasting +
 					";\n";
 				}
 				else{		
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " && " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " && " + $3.labelTemp +
 					";\n";
 				}
 			}
@@ -1436,7 +1449,9 @@ ERL         : '(' ERL ')'
 			{
 				$$.tipo = "bool";
 				fazCasting = tabelaDeTipos($1.tipo, $3.tipo);
-				string theCasting = ""; 
+				string theCasting = "";
+				Contexto c = retornarContextoDaVariavel($1.nomeVariavel);
+				string labelTemp = c.mapa[$1.nomeVariavel].labelTemp;
 
 				if(fazCasting == 1){					
 					string labelCasting = geraLabelTemp("float");
@@ -1444,7 +1459,7 @@ ERL         : '(' ERL ')'
 
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + labelCasting + " || " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " || " + $3.labelTemp +
 					";\n";
 
 				}
@@ -1454,14 +1469,14 @@ ERL         : '(' ERL ')'
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + theCasting +"\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " || " + labelCasting +
+					$$.labelTemp + " = " + labelTemp + " || " + labelCasting +
 					";\n";
 				}
 				else{		
 					
 					$$.labelTemp = geraLabelTemp($$.tipo);
 					$$.traducao = $1.traducao + $3.traducao + "\t" +
-					$$.labelTemp + " = " + $1.labelTemp + " || " + $3.labelTemp +
+					$$.labelTemp + " = " + labelTemp + " || " + $3.labelTemp +
 					";\n";
 				}
 			}
