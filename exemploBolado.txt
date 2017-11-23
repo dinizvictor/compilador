@@ -1,5 +1,3 @@
-tutto a = 0;
-
 iniziare principale(){	
 	
 	corda a = 'bc', altris = 'nan', out;

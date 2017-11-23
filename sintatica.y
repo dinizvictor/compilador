@@ -496,13 +496,27 @@ string verificaErros(Atributos $1, Atributos $3, int opcao){
 
 %%
 
-S		    : TOKEN_BEGIN TOKEN_MAIN '(' ')' BLOCO_MAIN 
+S		    : BLOCO_GLOBAL TOKEN_BEGIN TOKEN_MAIN '(' ')' BLOCO_MAIN 
             {
             	
             	$$.labelTemp = geraLabelFinal();
 				cout << "/*Compilador ITL*/\n" << "#include <iostream>\n#include <string.h>\n#include <stdio.h>\nint main(void){\n" <<
-				$$.labelTemp << $5.traducao << "\treturn 0;\n}" << endl; 							
+				$$.labelTemp << $1.traducao +$6.traducao << "\treturn 0;\n}" << endl; 							
 				
+			}
+			;
+
+BLOCO_GLOBAL: EMP_GLOBAL DCL_GLOBAL
+			{
+				$$.traducao = $2.traducao;
+			}
+			| BLOCO_MAIN
+			;
+
+EMP_GLOBAL	:
+			{	
+				//Empilha o Escopo Global
+				empilhaMapa(0,"","");
 			}
 
 BLOCO_MAIN	: EMP_MAIN '{' COMANDOS '}'
@@ -570,19 +584,9 @@ COMANDOS	: COMANDO COMANDOS
 			}
 			;
 
-COMANDO 	: TOKEN_NOMEVAR TOKEN_ATR E ';' 
-			{
-
-				$$.traducao = verificaErros($1, $3, 1);
-
-
-			}
-			| TOKEN_NOMEVAR TOKEN_ATR ERL ';' 
-			{
-
-				$$.traducao = verificaErros($1, $3, 2);
-			
-			}
+COMANDO 	: 
+			| ATR
+			| ATR_RL
 			| DCL ';'
 			| CONCATENACAO ';'
 			| IF
@@ -595,6 +599,27 @@ COMANDO 	: TOKEN_NOMEVAR TOKEN_ATR E ';'
 			| PRINT ';'
      	 	| CONTINUE ';'
 			| COMENT
+			;
+ATR_RL		: TOKEN_NOMEVAR TOKEN_ATR ERL ';'
+			{
+				$$.traducao = verificaErros($1, $3, 2);
+			}
+			;
+
+ATR 		: TOKEN_NOMEVAR TOKEN_ATR E ';'
+			{
+				$$.traducao = verificaErros($1, $3, 1);
+			}
+			;
+
+DCL_GLOBAL	: DCL ';' DCL_GLOBAL
+			{
+				$$.traducao = $1.traducao + $3.traducao;
+			}
+			|
+			{
+				$$.traducao = "";
+			}
 			;			
 
 DCL 		: TOKEN_INT TOKEN_NOMEVAR MLTVAR_INT
@@ -1072,9 +1097,9 @@ WHILE 		: TOKEN_WHILE ERL BLOCO_LOOP
 				
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = "\n\t//WHILE COMEÇA\n"+ $2.traducao +
+				$$.traducao = "\n\t" + sWhile +":\n\t" + "//WHILE COMEÇA\n"+ $2.traducao +
 				"\t" + $$.labelTemp + " = !" + $2.labelTemp + ";\n" +
-				"\t" + sWhile +":\n\t" + "if("+$$.labelTemp+")goto "+sFWhile+"\n"+$3.traducao+"\tgoto " + 
+				 "\tif("+$$.labelTemp+")goto "+sFWhile+"\n"+$3.traducao+"\tgoto " + 
 				sWhile +";\n\t"+ sFWhile + ":\n\t//WHILE TERMINA\n";
   				
   				desempilhaMapa();
@@ -1088,9 +1113,9 @@ DO_WHILE 	: TOKEN_DO BLOCO_LOOP  ERL ';'
 				
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = "\n\t//DO_WHILE COMEÇA\n"+ $3.traducao +
+				$$.traducao = "\n\t" + sDWhile +":\n"+ "\t//DO_WHILE COMEÇA\n"+ $3.traducao +
 				"\t" + $$.labelTemp + " = !" + $3.labelTemp + ";\n" +
-				"\t" + sDWhile +":\n"+$2.traducao+"\tif("+$$.labelTemp+") goto "+sFDWhile+";\n\tgoto " + 
+				$2.traducao+"\tif("+$$.labelTemp+") goto "+sFDWhile+";\n\tgoto " + 
 				sDWhile +";\n\t"+ sFDWhile + ":\n\t//DO_WHILE TERMINA\n";
   				
   				desempilhaMapa();
@@ -1104,9 +1129,9 @@ FOR			: TOKEN_FOR '('COMANDO ERL ';' E ')' BLOCO_LOOP
 
 				$$.tipo = "bool";
 				$$.labelTemp = geraLabelTemp($$.tipo);
-				$$.traducao = "\n\t//FOR COMEÇA\n"+ $3.traducao + $4.traducao +
+				$$.traducao = "\t" + sFor +":\n"+"\t//FOR COMEÇA\n"+ $3.traducao + $4.traducao +
 				"\t" + $$.labelTemp + " = !" + $4.labelTemp + ";\n" +
-				"\t" + sFor +":\n"+ "\t" + "if("+$$.labelTemp+") goto "+ sFFor +";\n"+$8.traducao + $6.traducao + "\tgoto "+sFor+";\n\t"+ sFFor + ":\n\t//FOR TERMINA\n";
+				 "\t" + "if("+$$.labelTemp+") goto "+ sFFor +";\n"+$8.traducao + $6.traducao + "\tgoto "+sFor+";\n\t"+ sFFor + ":\n\t//FOR TERMINA\n";
   				
   				desempilhaMapa();
 			}
